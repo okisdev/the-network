@@ -1,0 +1,10 @@
+# The Network: Douyin false positives
+#
+# Expects Domestic. Must precede the blocking rule sets.
+#
+# The reject set's keyword matching also catches Douyin's app API hosts on -normal.zijieapi.com and its realtime push channel, which takes the app off the air rather than removing an ad.
+#
+# These hosts filter on the TLS fingerprint, so a bare curl is always reset by the origin and can never be used as evidence that something local blocked it. Distinguish by timing instead: a local REJECT closes roughly 7ms after the TCP connect, while an origin reset carries the real round trip, anywhere from 17ms to over a second. The fastest check is to flip the AdBlock group to Direct for a second and see whether the symptom disappears.
+
+DOMAIN-KEYWORD,-normal.zijieapi.com
+DOMAIN-KEYWORD,frontier-aweme

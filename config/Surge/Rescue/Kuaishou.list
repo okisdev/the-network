@@ -1,0 +1,7 @@
+# The Network: Kuaishou false positives
+#
+# Expects Domestic. Must precede the blocking rule sets.
+#
+# Live streams pull from ks.pull.yximgs.com, which the reject set treats as PCDN infrastructure.
+
+DOMAIN-SUFFIX,ks.pull.yximgs.com

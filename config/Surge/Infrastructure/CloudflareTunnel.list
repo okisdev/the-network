@@ -1,0 +1,7 @@
+# The Network: Cloudflare Tunnel
+#
+# Expects DIRECT.
+#
+# cloudflared dials the Cloudflare edge on 7844 and carries its own transport security. Proxying it adds a hop to every tunnelled service for no benefit.
+
+DOMAIN-SUFFIX,argotunnel.com

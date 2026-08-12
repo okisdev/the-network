@@ -1,0 +1,20 @@
+# The Network: GitHub
+#
+# Expects a region group that is not Hong Kong. Must precede the general proxy classification, which would otherwise send these to the default proxy group.
+#
+# Measured 2026-08-12: both providers' Hong Kong exits intermittently drop the TLS handshake to GitHub's Asia frontend. Failure rates on fresh connections were 15% and 15% and 17.5% across two nodes of one provider and 12.5% on the other provider, while www.google.com through the same node at the same moment stayed at zero. Japan and Singapore were clean at 0 of 30 each.
+#
+# The destination is not at fault. Hong Kong and Singapore both resolve to the same frontend, 20.205.243.166, and only Hong Kong fails; Japan resolves to 20.27.177.113. So the fault is in the path from Hong Kong to that frontend, which is why changing provider does not help and changing exit region does.
+#
+# The failure shape at the gateway: the client hello goes into the tunnel, 320 bytes out, and nothing comes back for 7.27 seconds before the far end closes. A browser retries and succeeds, which is why this surfaces as a page that fails once and loads on reload rather than as an outage.
+#
+# The fault is intermittent. Hong Kong recovered on its own about half an hour later for github.com while still failing 2 of 20 on the githubusercontent hosts, so a clean spot check does not mean the pin can be removed.
+#
+# ghcr.io lives here rather than in Rescue/BlockedDirect.list: it needs a proxy anyway because download classification would send it direct, and it is GitHub, so it should share their exit.
+#
+# github.io is deliberately absent. GitHub Pages is served from different infrastructure and was not part of the measurement.
+
+DOMAIN-SUFFIX,github.com
+DOMAIN-SUFFIX,githubassets.com
+DOMAIN-SUFFIX,githubusercontent.com
+DOMAIN-SUFFIX,ghcr.io

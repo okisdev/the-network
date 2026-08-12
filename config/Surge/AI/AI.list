@@ -1,0 +1,64 @@
+# The Network: AI services
+#
+# Expects the AI Suite policy, referenced with extended-matching. Must precede the general proxy classification.
+#
+# extended-matching is not optional here. Clients that run their own encrypted DNS never ask the gateway to resolve, so they arrive as a raw IP with an SNI, and claude.com in particular resolves to GFW poisoned addresses on those clients. extended-matching matches on the SNI and hands the connection to the policy to resolve again, which replaces the destination rather than only changing the route. Without it those clients connect to a poisoned address and hang.
+#
+# This file owns the AI category outright rather than layering on top of a generic one. Generic AI classification gets two things wrong for this network: it treats the plain GitHub API as a model endpoint, and it misses several services in daily use here.
+#
+# Scope: a service earns a line when it is in use here or when it is unambiguously an AI endpoint with no chance of collateral. An omission costs the ability to steer AI separately, never connectivity, because everything else still lands on a proxy one way or another. Verified 2026-08-12: the Gemini backend hosts left out are caught by a google keyword rule in the general proxy classification, and the remainder, meta.ai and poe.com and the assorted image generators, reach the FINAL catch-all, which is also a proxy.
+#
+# Chinese providers are deliberately absent. Verified 2026-08-12 that the domestic classification already carries deepseek.com, kimi.com, doubao.com, tongyi.com, and z.ai, and that the .cn catch-all behind it carries moonshot.cn, bigmodel.cn, and siliconflow.cn. Adding them here would only create a second place to be wrong.
+
+# Anthropic
+DOMAIN-SUFFIX,anthropic.com
+DOMAIN-SUFFIX,claude.ai
+DOMAIN-SUFFIX,claude.com
+
+# OpenAI. The keyword covers Azure hosted deployments and the assorted api hosts.
+DOMAIN-SUFFIX,openai.com
+DOMAIN-SUFFIX,chatgpt.com
+DOMAIN-SUFFIX,oaistatic.com
+DOMAIN-SUFFIX,oaiusercontent.com
+DOMAIN-SUFFIX,sora.com
+DOMAIN-KEYWORD,openai
+
+# xAI
+DOMAIN-SUFFIX,x.ai
+DOMAIN-SUFFIX,grok.com
+
+# Google
+DOMAIN,ai.google.dev
+DOMAIN,jules.google.com
+DOMAIN,antigravity.google
+DOMAIN-SUFFIX,gemini.google
+DOMAIN-SUFFIX,gemini.google.com
+DOMAIN-SUFFIX,aistudio.google.com
+DOMAIN-SUFFIX,notebooklm.google
+DOMAIN-SUFFIX,notebooklm.google.com
+DOMAIN-SUFFIX,deepmind.google
+DOMAIN-SUFFIX,generativelanguage.googleapis.com
+DOMAIN-SUFFIX,cloudcode-pa.googleapis.com
+
+# GitHub Copilot. The model endpoint is githubcopilot.com; api.github.com is ordinary
+# GitHub API traffic and lives in config/Surge/GitHub/GitHub.list.
+DOMAIN-SUFFIX,githubcopilot.com
+
+# Editors and agent tooling
+DOMAIN-SUFFIX,cursor.com
+DOMAIN-SUFFIX,cursor.sh
+DOMAIN,api.jetbrains.ai
+
+# Raycast. The suffix covers the whole product deliberately: its AI and dictation
+# endpoints need a foreign exit, and so does the rest of it.
+DOMAIN-SUFFIX,raycast.com
+
+# Aggregators, inference hosts, and model registries
+DOMAIN,openrouter.ai
+DOMAIN,gateway.ai.cloudflare.com
+DOMAIN-SUFFIX,perplexity.ai
+DOMAIN-SUFFIX,ollama.com
+DOMAIN-SUFFIX,groq.com
+DOMAIN-SUFFIX,mistral.ai
+DOMAIN-SUFFIX,huggingface.co
+DOMAIN-SUFFIX,hf.co
