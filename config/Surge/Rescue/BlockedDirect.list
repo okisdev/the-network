@@ -1,0 +1,13 @@
+# The Network: blocked hosts that generic classification sends direct
+#
+# Expects Proxy. Must precede the download classification.
+#
+# Download classification exists to keep large transfers on domestic CDNs at line speed, and it treats these as download hosts. They are also blocked here, so direct means dead rather than fast.
+#
+# ghcr.io belongs to this category too but lives in config/Surge/GitHub/GitHub.list, so that it shares an exit with the rest of GitHub.
+
+DOMAIN-SUFFIX,mega.nz
+DOMAIN-SUFFIX,mega.co.nz
+DOMAIN-SUFFIX,mega.io
+DOMAIN-SUFFIX,archive.org
+DOMAIN-SUFFIX,gcr.io
