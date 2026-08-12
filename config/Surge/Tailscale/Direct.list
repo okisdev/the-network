@@ -1,0 +1,10 @@
+# The Network: Tailscale direct
+#
+# Expects DIRECT. Must follow Coordination.list.
+#
+# The DERP relays double as STUN servers, so proxying them makes Tailscale advertise the proxy's address as its own endpoint. That defeats NAT traversal and pins every peer to relay. The guard that enforces this for the STUN port is a logical rule and cannot live in a rule set, so it stays inline in the profile:
+#
+#   AND,((PROTOCOL,UDP),(DEST-PORT,3478)),DIRECT
+
+DOMAIN-SUFFIX,tailscale.com
+DOMAIN-SUFFIX,tailscale.io

@@ -1,0 +1,9 @@
+# The Network: tailnet address space
+#
+# Referenced twice, once per platform, with a different policy each time. On macOS the native client owns this range outside Surge's virtual interface, so it expects DIRECT. On iOS the tunnel runs inside Surge as a Tailscale policy, because iOS allows only one VPN tunnel and installing the official client would displace Surge entirely.
+#
+# The platform split cannot live inside this file: rule set files have no platform directive. Reference it twice instead, and let the panel worker resolve the directives.
+
+IP-CIDR,100.64.0.0/10,no-resolve
+IP-CIDR6,fd7a:115c:a1e0::/48,no-resolve
+DOMAIN-SUFFIX,ts.net

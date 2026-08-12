@@ -1,0 +1,9 @@
+# The Network: Tailscale coordination and admin
+#
+# Expects a proxy policy. Must precede Direct.list, whose tailscale.com suffix would otherwise swallow these.
+#
+# The coordination server is not reliably reachable from CN, and the admin console is ordinary browser traffic that has no reason to be direct.
+
+DOMAIN,console.tailscale.com
+DOMAIN,controlplane.tailscale.com
+DOMAIN,login.tailscale.com
