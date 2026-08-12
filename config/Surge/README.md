@@ -66,7 +66,7 @@ Two things have to stay inline in the gateway profile, and both are load bearing
 
 - The entire block precedes the profile's broad classification. A repair rule placed behind the classification it is repairing does nothing.
 - `Tailscale/Coordination.list` precedes `Tailscale/Direct.list`, because the coordination hosts are covered by the `tailscale.com` suffix in the second file.
-- IP rules stay below every domain rule in the profile as a whole. Breaking that order forfeits the protection against DNS poisoning that the layering is built around.
+- IP rules stay below every domain rule in the profile as a whole. Breaking that order forfeits the protection against DNS poisoning that the layering is built around. The address rules inside this block are the deliberate exception: they all carry `no-resolve`, so they can never trigger a lookup, and they exist only to catch clients that run their own encrypted DNS and therefore arrive as a bare address.
 
 ## Policies referenced
 

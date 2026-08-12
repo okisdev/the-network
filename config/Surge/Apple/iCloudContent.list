@@ -4,7 +4,7 @@
 #
 # iMessage attachments transfer over MMCS, which resolves into this content service. Two things went wrong while it rode the proxy. The global block-quic setting applies to every proxy policy, so the transfer's QUIC was rejected and images stalled: 35 blocked attempts in a 6.6 minute window, 10 in a 2.4 minute window, all from one phone. Whatever fell back to TCP then inherited the proxy path's instability. Routing the service direct fixes both at once, because block-quic never applies to DIRECT.
 #
-# Do not confuse this range with iCloud Private Relay. Private Relay ingress is mask.icloud.com and mask-h2.icloud.com on 17.248.152.0/24 and 17.248.163.0/24, a different service with a different failure mode, and it is not covered by this file.
+# Do not confuse this range with the relay ingress. mask.icloud.com and mask-h2.icloud.com resolve into 17.248.152.0/24 and 17.248.163.0/24, a different service with a different failure mode that this file does not cover. Those two ranges are shared, so they cannot be used to identify a service: apple-relay.apple.com resolves into them as well. Anything targeting either service has to match on the domain.
 #
 # The IP range is observed locally rather than published by Apple: content.icloud.com and p*-content.icloud.com both resolved into it. Recheck it if attachments regress.
 
