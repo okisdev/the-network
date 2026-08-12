@@ -1,0 +1,25 @@
+# The Network: Apple push
+#
+# Expects DIRECT. Must precede the broader Apple classification, whose blanket IP-CIDR,17.0.0.0/8 would otherwise pull push into the proxy.
+#
+# APNs is one long-lived TCP connection per device, and instant delivery depends on it staying up. Riding a proxy policy group makes it fragile in a way that has nothing to do with reachability: every reselection of that group severs the connection on every device at once. Measured on 2026-08-12, a single policy group switch left all seven push connections in the house, across two Macs, a phone, and the gateway itself, re-established within the same second. The phone recovers quickly because iOS reconnects aggressively and can fall back to cellular; a Mac has no second path, and macOS backs off exponentially when the reconnect lands in a bad window, so pushes queue at Apple and arrive minutes late. The symptom is a message that the phone already shows and the Mac does not, with Messages open the whole time.
+#
+# Push is reachable domestically, so the proxy was buying nothing and costing that.
+#
+# A second effect of proxying push: the egress region decides which courier Apple assigns. Through a Hong Kong exit a Mac registers with us-courier.push.apple.com, so every notification travels to a US courier and back.
+#
+# IP ranges are Apple's published list: https://support.apple.com/en-us/102266
+
+DOMAIN-SUFFIX,push.apple.com
+DOMAIN-SUFFIX,push-apple.com.akadns.net
+
+IP-CIDR,17.57.144.0/22,no-resolve
+IP-CIDR,17.188.20.0/23,no-resolve
+IP-CIDR,17.188.128.0/18,no-resolve
+IP-CIDR,17.249.0.0/16,no-resolve
+IP-CIDR,17.252.0.0/16,no-resolve
+
+IP-CIDR6,2403:300:a42::/48,no-resolve
+IP-CIDR6,2403:300:a51::/48,no-resolve
+IP-CIDR6,2620:149:a44::/48,no-resolve
+IP-CIDR6,2a01:b740:a42::/48,no-resolve
