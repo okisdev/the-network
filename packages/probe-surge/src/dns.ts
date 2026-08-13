@@ -8,6 +8,8 @@ const entrySchema = z
     domain: z.string().trim().min(1),
     data: z.array(z.string()).catch([]).default([]),
     timeCost: z.number().finite().optional(),
+    server: z.string().optional(),
+    source: z.string().optional(),
   })
   .passthrough();
 
@@ -24,6 +26,7 @@ export function mapDnsCache(payload: unknown, nowMs: number): DnsEvent[] {
   for (const raw of parsed.data.dnsCache) {
     const entry = entrySchema.safeParse(raw);
     if (!entry.success) continue;
+    const source = mapDnsSource(entry.data.source);
     events.push({
       kind: 'dns',
       ts: nowMs,
@@ -33,9 +36,18 @@ export function mapDnsCache(payload: unknown, nowMs: number): DnsEvent[] {
       ...(entry.data.timeCost === undefined
         ? {}
         : { rttMs: Math.round(entry.data.timeCost * 1_000) }),
+      ...(entry.data.server !== undefined && entry.data.server !== ''
+        ? { server: entry.data.server }
+        : {}),
+      ...(source !== undefined ? { source } : {}),
     });
   }
   return events;
+}
+
+function mapDnsSource(raw: string | undefined): 'cache' | 'server' | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  return /cache/i.test(raw) ? 'cache' : 'server';
 }
 
 export class DnsDeduper {

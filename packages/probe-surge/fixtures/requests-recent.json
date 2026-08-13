@@ -33,6 +33,7 @@
       "method": "TCP",
       "URL": "push.apple.com:5223",
       "policyName": "DIRECT",
+      "originalPolicyName": "DIRECT",
       "rule": "RULE-SET, ApplePush.list",
       "startDate": 1769990000.1,
       "inBytes": 8123,

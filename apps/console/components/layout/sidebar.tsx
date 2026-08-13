@@ -8,6 +8,7 @@ import {
   MonitorSmartphone,
   PlugZap,
   ScrollText,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,6 +19,7 @@ const MONITOR_ITEMS: Array<{ href: string; label: string; icon: LucideIcon }> = 
   { href: "/devices", label: "Devices", icon: MonitorSmartphone },
   { href: "/flows", label: "Flows", icon: ArrowRightLeft },
   { href: "/destinations", label: "Destinations", icon: Globe },
+  { href: "/insights", label: "Insights", icon: Sparkles },
   { href: "/logs", label: "Logs", icon: ScrollText },
 ];
 

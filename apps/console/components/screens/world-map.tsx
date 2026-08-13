@@ -1,11 +1,12 @@
 "use client";
 
-import type { DestinationCountry } from "@the-network/schema";
+import type { CityPoint, DestinationCountry } from "@the-network/schema";
 import { geoCentroid } from "d3-geo";
 import { useMemo } from "react";
 import { ComposableMap, Geographies, Geography, Line, Marker } from "react-simple-maps";
 import topology from "world-atlas/countries-110m.json";
 import { ALPHA2_TO_NUMERIC, NUMERIC_TO_ALPHA2 } from "@/components/screens/destinations-data";
+import { formatBytes } from "@/lib/format";
 
 const HOME: [number, number] = [121.47, 31.23];
 const worldData = topology as unknown as object;
@@ -21,10 +22,12 @@ function shareFill(share: number): string {
 
 export function WorldMap({
   countries,
+  cities = [],
   selected,
   onSelect,
 }: {
   countries: DestinationCountry[];
+  cities?: CityPoint[];
   selected: string | null;
   onSelect: (code: string) => void;
 }) {
@@ -47,6 +50,21 @@ export function WorldMap({
     [countries],
   );
   const maxArcBytes = Math.max(1, ...topArcs.map(countryBytes));
+  const visibleCities = useMemo(
+    () =>
+      [...cities]
+        .filter(
+          (city) =>
+            Number.isFinite(city.lat) &&
+            Number.isFinite(city.lon) &&
+            Number.isFinite(city.bytes) &&
+            city.bytes >= 0,
+        )
+        .sort((a, b) => b.bytes - a.bytes)
+        .slice(0, 60),
+    [cities],
+  );
+  const maxCityBytes = Math.max(1, ...visibleCities.map((city) => city.bytes));
 
   return (
     <ComposableMap
@@ -152,6 +170,22 @@ export function WorldMap({
                   strokeLinecap="round"
                   opacity={0.5}
                 />
+              ))}
+              {visibleCities.map((city) => (
+                <Marker
+                  key={`${city.country}-${city.city}-${city.lat}-${city.lon}`}
+                  coordinates={[city.lon, city.lat]}
+                >
+                  <circle
+                    r={1.6 + 2.8 * Math.sqrt(city.bytes / maxCityBytes)}
+                    fill="var(--color-chart-2)"
+                    fillOpacity={0.65}
+                    stroke="var(--color-card)"
+                    strokeWidth={0.4}
+                  >
+                    <title>{`${city.city}, ${city.country} · ${formatBytes(city.bytes)}`}</title>
+                  </circle>
+                </Marker>
               ))}
               <Marker coordinates={HOME}>
                 <circle r={6} fill="var(--color-ok)" opacity={0.25} />

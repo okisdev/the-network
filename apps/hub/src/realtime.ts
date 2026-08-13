@@ -27,7 +27,14 @@ export class Realtime {
     this.removeDnsListener = pipeline.onDns((entries) => this.broadcastDns(entries));
     this.timers.push(
       setInterval(
-        () => this.broadcast({ type: 'summary', data: this.pipeline.getSummary() }),
+        () =>
+          this.broadcast({
+            type: 'summary',
+            data: {
+              ...this.pipeline.getSummary(),
+              flowsActive: this.pipeline.activeFlowCount(),
+            },
+          }),
         options.summaryIntervalMs ?? 1_000,
       ),
       setInterval(() => this.pushDevices(), options.devicesIntervalMs ?? 2_000),

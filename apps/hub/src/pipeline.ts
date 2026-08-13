@@ -9,7 +9,7 @@ import type {
   ProbeEvent,
   SummaryPush,
 } from '@the-network/schema';
-import { createGeoLookup, type GeoLookup } from './geo.ts';
+import { createGeoLookup, type GeoLookup, type GeoResolver } from './geo.ts';
 import { Identity } from './identity.ts';
 import type { Logger } from './logger.ts';
 import { logger } from './logger.ts';
@@ -22,6 +22,7 @@ const DEVICE_ONLINE_MS = 120_000;
 
 interface RegistryRow extends FlowWrite {
   deviceName: string;
+  geoResolved: boolean;
   dirty: boolean;
   pendingBytesIn: number;
   pendingBytesOut: number;
@@ -50,7 +51,7 @@ export interface PipelineOptions {
   autoStart?: boolean;
   now?: () => number;
   logger?: Logger;
-  geoLookup?: GeoLookup;
+  geoLookup?: GeoResolver;
 }
 
 function flowDto(row: RegistryRow): FlowDto {
@@ -71,11 +72,24 @@ function flowDto(row: RegistryRow): FlowDto {
     ...(row.country === undefined ? {} : { country: row.country }),
     ...(row.policy === undefined ? {} : { policy: row.policy }),
     ...(row.policyChain === undefined ? {} : { policyChain: row.policyChain }),
+    ...(row.policyGroup === undefined ? {} : { policyGroup: row.policyGroup }),
     ...(row.rule === undefined ? {} : { rule: row.rule }),
     ...(row.process === undefined ? {} : { process: row.process }),
+    ...(row.processPath === undefined ? {} : { processPath: row.processPath }),
+    ...(row.proxied === undefined ? {} : { proxied: row.proxied }),
+    ...(row.connectMs === undefined ? {} : { connectMs: row.connectMs }),
+    ...(row.city === undefined ? {} : { city: row.city }),
     ...(row.startedAt === undefined ? {} : { startedAt: row.startedAt }),
     ...(row.endedAt === undefined ? {} : { endedAt: row.endedAt }),
   };
+}
+
+function stickyString(current: string | undefined, next: string | undefined): string | undefined {
+  return current || next || undefined;
+}
+
+function stickyStrings(current: string[] | undefined, next: string[] | undefined): string[] | undefined {
+  return current?.length ? current : next?.length ? next : undefined;
 }
 
 function decayedRate(state: RateState | WanState, now: number): { rateIn: number; rateOut: number } {
@@ -92,6 +106,7 @@ export class Pipeline {
   private readonly eventListeners = new Set<(event: EventDto) => void>();
   private readonly dnsListeners = new Set<(entries: DnsLogEntry[]) => void>();
   private readonly totalsBySource = new Map<string, WanTotals>();
+  private onlineDevices = new Set<string>();
   private pendingRollups: RollupIncrement[] = [];
   private wan: WanState = { rateIn: 0, rateOut: 0, lastUpdate: 0 };
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -109,6 +124,7 @@ export class Pipeline {
     this.now = options.now ?? Date.now;
     this.log = options.logger ?? logger;
     this.geoLookup = createGeoLookup(options.geoLookup);
+    this.store.closeStalePresence(this.now());
     if (options.autoStart !== false) this.start();
   }
 
@@ -166,6 +182,8 @@ export class Pipeline {
               qname: event.qname,
               answers: event.answers,
               ...(event.rttMs === undefined ? {} : { rttMs: event.rttMs }),
+              ...(event.server === undefined ? {} : { server: event.server }),
+              ...(event.source === undefined ? {} : { source: event.source }),
             }),
           );
           break;
@@ -183,9 +201,8 @@ export class Pipeline {
     const current = this.registry.get(event.flowId);
     const deviceName = this.store.getDeviceById(deviceId)?.name ?? 'Unknown device';
     const endedAt = event.state === 'active' ? current?.endedAt : event.ts;
-    const country =
-      current?.country ??
-      (event.dst.ip === undefined ? undefined : this.geoLookup(event.dst.ip));
+    const ip = event.dst.ip ?? current?.ip;
+    const geo = current?.geoResolved || ip === undefined ? undefined : this.geoLookup(ip);
     const row: RegistryRow = {
       id: event.flowId,
       sourceId,
@@ -199,13 +216,21 @@ export class Pipeline {
       bytesIn: (current?.bytesIn ?? 0) + event.bytesIn,
       bytesOut: (current?.bytesOut ?? 0) + event.bytesOut,
       state: event.state,
-      policy: event.attrs?.policy ?? current?.policy,
-      policyChain: event.attrs?.policyChain ?? current?.policyChain,
-      rule: event.attrs?.rule ?? current?.rule,
-      process: event.attrs?.process ?? current?.process,
-      ...(country === undefined ? {} : { country }),
-      startedAt: event.attrs?.startedAt ?? current?.startedAt,
+      policy: stickyString(current?.policy, event.attrs?.policy),
+      policyChain: stickyStrings(current?.policyChain, event.attrs?.policyChain),
+      policyGroup: stickyString(current?.policyGroup, event.attrs?.policyGroup),
+      rule: stickyString(current?.rule, event.attrs?.rule),
+      process: stickyString(current?.process, event.attrs?.process),
+      processPath: stickyString(current?.processPath, event.attrs?.processPath),
+      proxied: current?.proxied ?? event.attrs?.proxied,
+      connectMs: current?.connectMs ?? event.attrs?.connectMs,
+      country: current?.country ?? geo?.country,
+      city: current?.city ?? geo?.city,
+      lat: current?.lat ?? geo?.lat,
+      lon: current?.lon ?? geo?.lon,
+      startedAt: current?.startedAt ?? event.attrs?.startedAt,
       ...(endedAt === undefined ? {} : { endedAt }),
+      geoResolved: current?.geoResolved === true || geo !== undefined,
       dirty: true,
       pendingBytesIn: (current?.pendingBytesIn ?? 0) + event.bytesIn,
       pendingBytesOut: (current?.pendingBytesOut ?? 0) + event.bytesOut,
@@ -293,6 +318,7 @@ export class Pipeline {
   }
 
   flush(): void {
+    this.syncPresence(this.now());
     const dirty = [...this.registry.values()].filter((row) => row.dirty);
     if (dirty.length === 0 && this.pendingRollups.length === 0) return;
     const flows: FlowWrite[] = dirty.map((row) => ({
@@ -309,9 +335,16 @@ export class Pipeline {
       state: row.state,
       ...(row.policy === undefined ? {} : { policy: row.policy }),
       ...(row.policyChain === undefined ? {} : { policyChain: row.policyChain }),
+      ...(row.policyGroup === undefined ? {} : { policyGroup: row.policyGroup }),
       ...(row.rule === undefined ? {} : { rule: row.rule }),
       ...(row.process === undefined ? {} : { process: row.process }),
+      ...(row.processPath === undefined ? {} : { processPath: row.processPath }),
+      ...(row.proxied === undefined ? {} : { proxied: row.proxied }),
+      ...(row.connectMs === undefined ? {} : { connectMs: row.connectMs }),
       ...(row.country === undefined ? {} : { country: row.country }),
+      ...(row.city === undefined ? {} : { city: row.city }),
+      ...(row.lat === undefined ? {} : { lat: row.lat }),
+      ...(row.lon === undefined ? {} : { lon: row.lon }),
       ...(row.startedAt === undefined ? {} : { startedAt: row.startedAt }),
       ...(row.endedAt === undefined ? {} : { endedAt: row.endedAt }),
       rollupBytesIn: row.pendingBytesIn,
@@ -326,6 +359,25 @@ export class Pipeline {
       row.pendingBytesOut = 0;
       if (row.state !== 'active') this.registry.delete(row.id);
     }
+  }
+
+  private syncPresence(now: number): void {
+    const onlineDevices = this.store.onlineDeviceIds(now);
+    for (const deviceId of onlineDevices) {
+      if (!this.onlineDevices.has(deviceId)) this.store.openPresence(deviceId, now);
+    }
+    for (const deviceId of this.onlineDevices) {
+      if (!onlineDevices.has(deviceId)) this.store.closePresence(deviceId, now);
+    }
+    this.onlineDevices = onlineDevices;
+  }
+
+  activeFlowCount(): number {
+    let count = 0;
+    for (const flow of this.registry.values()) {
+      if (flow.state === 'active') count += 1;
+    }
+    return count;
   }
 
   getSummary(now: number = this.now()): SummaryPush {

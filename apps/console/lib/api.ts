@@ -1,12 +1,25 @@
 import type {
+  BreakdownDim,
+  BreakdownDto,
+  CityPoint,
   CountryDeviceShare,
+  DailyPoint,
   DestinationsDto,
+  DeviceDetailDto,
   DeviceDto,
   DnsLogPage,
+  DnsSummaryDto,
+  FirstSeenDto,
   FlowsPage,
   FlowsQuery,
+  HostDetailDto,
   LogsQuery,
+  MoversDto,
+  MultiSeriesDto,
   OverviewDto,
+  PunchcardDto,
+  RejectedSummaryDto,
+  SankeyDto,
   SourceDto,
   SourceInput,
   SystemLogPage,
@@ -55,6 +68,24 @@ export const api = {
   device: (id: string) => request<DeviceDto>(`/api/devices/${id}`),
   flows: (query: FlowsQuery = {}) => request<FlowsPage>(`/api/flows${qs(query)}`),
   timeseries: (query: TimeseriesQuery) => request<TimeseriesPoint[]>(`/api/timeseries${qs(query)}`),
+  timeseriesMulti: (query: { scope: "device" | "policy"; minutes: number; limit?: number }) =>
+    request<MultiSeriesDto[]>(`/api/timeseries/multi${qs(query)}`),
+  breakdown: (query: { dim: BreakdownDim; minutes: number; deviceId?: string; limit?: number }) =>
+    request<BreakdownDto>(`/api/breakdown${qs(query)}`),
+  sankey: (query: { minutes: number; limit?: number }) =>
+    request<SankeyDto>(`/api/sankey${qs(query)}`),
+  punchcard: (days: number) => request<PunchcardDto>(`/api/insights/punchcard${qs({ days })}`),
+  daily: (days: number) => request<DailyPoint[]>(`/api/insights/daily${qs({ days })}`),
+  movers: (minutes: number) => request<MoversDto>(`/api/insights/movers${qs({ minutes })}`),
+  firstSeen: (days: number) => request<FirstSeenDto>(`/api/insights/firstseen${qs({ days })}`),
+  rejected: (minutes: number) =>
+    request<RejectedSummaryDto>(`/api/insights/rejected${qs({ minutes })}`),
+  deviceDetail: (id: string, minutes: number) =>
+    request<DeviceDetailDto>(`/api/devices/${encodeURIComponent(id)}/detail${qs({ minutes })}`),
+  cities: (minutes: number) => request<CityPoint[]>(`/api/destinations/cities${qs({ minutes })}`),
+  hostDetail: (host: string, minutes: number) =>
+    request<HostDetailDto>(`/api/hosts/${encodeURIComponent(host)}${qs({ minutes })}`),
+  dnsSummary: (minutes: number) => request<DnsSummaryDto>(`/api/dns/summary${qs({ minutes })}`),
   destinations: () => request<DestinationsDto>("/api/destinations"),
   countryDevices: (code: string) =>
     request<CountryDeviceShare[]>(`/api/destinations/${encodeURIComponent(code)}/devices`),

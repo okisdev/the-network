@@ -39,6 +39,21 @@ function settingNumber(settings: Record<string, unknown>, key: string, fallback:
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function intervalSummary(settings: Record<string, unknown>): string | null {
+  const parts: string[] = [];
+  for (const [key, label] of [
+    ["requestsIntervalMs", "requests"],
+    ["devicesIntervalMs", "devices"],
+    ["trafficIntervalMs", "traffic"],
+  ] as const) {
+    const value = settings[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      parts.push(`${label} ${value / 1000}s`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 function initialForm(source?: SourceDto): SourceForm {
   if (!source) {
     return {
@@ -178,6 +193,7 @@ export function SourcesScreen() {
             const status = statusDetails(source);
             const url = settingString(source.settings, "url");
             const apiKey = settingString(source.settings, "apiKey");
+            const intervals = intervalSummary(source.settings);
             const isPending = pendingId === source.id;
             const confirmingDelete = confirmDeleteId === source.id;
             return (
@@ -192,6 +208,11 @@ export function SourcesScreen() {
                       {url && <span className="truncate">{url}</span>}
                       {apiKey && <span>{apiKey}</span>}
                     </div>
+                    {intervals && (
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                        {intervals}
+                      </p>
+                    )}
                   </div>
 
                   <div className="min-w-[150px]">
@@ -204,10 +225,20 @@ export function SourcesScreen() {
                       >
                         <Badge tone={status.tone}>{status.label}</Badge>
                       </span>
+                      {source.eventsPerMinute != null && source.eventsPerMinute !== 0 && (
+                        <Badge tone="primary">
+                          {Math.round(source.eventsPerMinute)} ev/min
+                        </Badge>
+                      )}
                     </div>
                     {source.status.lastSuccessAt && (
                       <p className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
                         Last success {formatTimeAgo(source.status.lastSuccessAt)}
+                      </p>
+                    )}
+                    {source.lastEventAt !== undefined && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Last event {formatTimeAgo(source.lastEventAt)}
                       </p>
                     )}
                   </div>

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import {
   surgeSettingsSchema,
+  type DeviceDetailDto,
   type FlowsQuery,
   type LogsQuery,
   type OverviewDto,
@@ -42,6 +43,11 @@ const flowsQuerySchema = z.object({
   policy: z.string().optional(),
   country: z.string().optional(),
   state: z.enum(['active', 'completed', 'failed']).optional(),
+  proto: z.enum(['tcp', 'udp', 'other']).optional(),
+  port: z.coerce.number().int().min(0).max(65_535).optional(),
+  process: z.string().min(1).optional(),
+  from: z.coerce.number().int().optional(),
+  to: z.coerce.number().int().optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
@@ -54,9 +60,57 @@ const logsQuerySchema = z.object({
 });
 
 const timeseriesQuerySchema = z.object({
-  scope: z.string().refine((value): value is TimeseriesQuery['scope'] => value === 'wan' || value.startsWith('device:')),
+  scope: z
+    .string()
+    .refine(
+      (value): value is TimeseriesQuery['scope'] =>
+        value === 'wan' ||
+        ['device:', 'policy:', 'host:', 'country:'].some((prefix) => value.startsWith(prefix)),
+    ),
   minutes: z.coerce.number().int().min(1).max(525_600),
 });
+
+const minutesSchema = z.coerce.number().int().min(1).max(525_600);
+
+const minutesQuerySchema = z.object({ minutes: minutesSchema });
+
+const deviceDetailParamsSchema = z.object({ id: z.string().min(1) });
+
+const hostDetailParamsSchema = z.object({ host: z.string().trim().min(1) });
+
+const multiTimeseriesQuerySchema = z.object({
+  scope: z.enum(['device', 'policy']),
+  minutes: minutesSchema,
+  limit: z.coerce.number().int().min(1).max(12).default(5),
+});
+
+const breakdownQuerySchema = z.object({
+  dim: z.enum(['process', 'port', 'proto', 'rule', 'policy', 'country', 'host', 'domain']),
+  minutes: minutesSchema,
+  deviceId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+});
+
+const sankeyQuerySchema = z.object({
+  minutes: minutesSchema,
+  limit: z.coerce.number().int().min(1).max(12).default(8),
+});
+
+const punchcardQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(28),
+});
+
+const dailyQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(60).default(30),
+});
+
+const moversQuerySchema = z.object({ minutes: minutesSchema });
+
+const firstSeenQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(30).default(7),
+});
+
+const rejectedQuerySchema = z.object({ minutes: minutesSchema });
 
 export interface ApiOptions {
   config: Pick<HubConfig, 'consoleDist'>;
@@ -120,6 +174,9 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
       today: summary.today,
       activeDevices: summary.activeDevices,
       totalDevices: aggregate.totalDevices,
+      flowsActive: pipeline.activeFlowCount(),
+      rejectedToday: aggregate.rejectedToday,
+      dnsToday: aggregate.dnsToday,
       topDevices: aggregate.topDevices.map((device) => ({
         deviceId: device.deviceId,
         name: device.name,
@@ -133,6 +190,28 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   });
 
   app.get('/api/devices', async () => store.listDeviceDtos(pipeline.deviceRates()));
+
+  app.get<{ Params: { id: string } }>('/api/devices/:id/detail', async (request, reply) => {
+    const { id } = deviceDetailParamsSchema.parse(request.params);
+    const { minutes } = minutesQuerySchema.parse(request.query);
+    const now = Date.now();
+    const device = store
+      .listDeviceDtos(pipeline.deviceRates(now), now)
+      .find((candidate) => candidate.id === id);
+    if (device === undefined) return reply.code(404).send({ message: 'Device not found' });
+    const detail: DeviceDetailDto = {
+      device,
+      series: store.timeseries(`device:${id}`, minutes, now),
+      topHosts: store.deviceRollupBreakdown(id, 'host', minutes, 10, now),
+      topCountries: store.deviceRollupBreakdown(id, 'country', minutes, 8, now),
+      topProcesses: store.breakdown('process', minutes, id, 8, now).rows,
+      topPorts: store.breakdown('port', minutes, id, 8, now).rows,
+      policySplit: store.devicePolicySplit(id, minutes, 6, now),
+      presence: store.listPresence(id, now - minutes * 60_000, now),
+      recentFlows: store.listFlows({ deviceId: id, limit: 15 }).flows,
+    };
+    return detail;
+  });
 
   app.get<{ Params: { id: string } }>('/api/devices/:id', async (request, reply) => {
     const device = store
@@ -149,6 +228,11 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/destinations', async () => store.getDestinations());
 
+  app.get('/api/destinations/cities', async (request) => {
+    const query = minutesQuerySchema.parse(request.query);
+    return store.listCities(query.minutes);
+  });
+
   app.get<{ Params: { code: string } }>('/api/destinations/:code/devices', async (request) =>
     store.getCountryDevices(request.params.code.toUpperCase()),
   );
@@ -156,6 +240,17 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get('/api/logs/dns', async (request) => {
     const query = logsQuerySchema.parse(request.query) as LogsQuery;
     return store.listDnsLog(query);
+  });
+
+  app.get('/api/dns/summary', async (request) => {
+    const query = minutesQuerySchema.parse(request.query);
+    return store.dnsSummary(query.minutes);
+  });
+
+  app.get<{ Params: { host: string } }>('/api/hosts/:host', async (request) => {
+    const { host } = hostDetailParamsSchema.parse(request.params);
+    const { minutes } = minutesQuerySchema.parse(request.query);
+    return store.hostDetail(host, minutes);
   });
 
   app.get('/api/logs/system', async (request) => {
@@ -166,6 +261,46 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   app.get('/api/timeseries', async (request) => {
     const query = timeseriesQuerySchema.parse(request.query);
     return store.timeseries(query.scope, query.minutes);
+  });
+
+  app.get('/api/timeseries/multi', async (request) => {
+    const query = multiTimeseriesQuerySchema.parse(request.query);
+    return store.multiTimeseries(query.scope, query.minutes, query.limit);
+  });
+
+  app.get('/api/breakdown', async (request) => {
+    const query = breakdownQuerySchema.parse(request.query);
+    return store.breakdown(query.dim, query.minutes, query.deviceId, query.limit);
+  });
+
+  app.get('/api/sankey', async (request) => {
+    const query = sankeyQuerySchema.parse(request.query);
+    return store.sankey(query.minutes, query.limit);
+  });
+
+  app.get('/api/insights/punchcard', async (request) => {
+    const query = punchcardQuerySchema.parse(request.query);
+    return store.punchcard(query.days);
+  });
+
+  app.get('/api/insights/daily', async (request) => {
+    const query = dailyQuerySchema.parse(request.query);
+    return store.daily(query.days);
+  });
+
+  app.get('/api/insights/movers', async (request) => {
+    const query = moversQuerySchema.parse(request.query);
+    return store.movers(query.minutes);
+  });
+
+  app.get('/api/insights/firstseen', async (request) => {
+    const query = firstSeenQuerySchema.parse(request.query);
+    return store.firstSeen(query.days);
+  });
+
+  app.get('/api/insights/rejected', async (request) => {
+    const query = rejectedQuerySchema.parse(request.query);
+    return store.rejected(query.minutes);
   });
 
   app.get('/api/sources', async () => store.listSources().map((source) => sourceDto(source, probes)));

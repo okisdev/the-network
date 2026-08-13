@@ -5,7 +5,15 @@ import geoip from 'geoip-lite';
 
 const CACHE_LIMIT = 10_000;
 
-export type GeoLookup = (ip: string) => string | undefined;
+export interface GeoResult {
+  country?: string;
+  city?: string;
+  lat?: number;
+  lon?: number;
+}
+
+export type GeoLookup = (ip: string) => GeoResult | undefined;
+export type GeoResolver = (ip: string) => GeoResult | string | undefined;
 
 function isPrivateOrLoopback(ip: string): boolean {
   const normalized = ip.toLowerCase().split('%', 1)[0] ?? ip.toLowerCase();
@@ -34,19 +42,42 @@ function isPrivateOrLoopback(ip: string): boolean {
   return (firstGroup & 0xfe00) === 0xfc00 || (firstGroup & 0xffc0) === 0xfe80;
 }
 
-const geoIpLookup: GeoLookup = (ip) => geoip.lookup(ip)?.country || undefined;
+const geoIpLookup: GeoLookup = (ip) => {
+  const record = geoip.lookup(ip);
+  if (record === null) return undefined;
+  const [lat, lon] = record.ll;
+  return {
+    ...(record.country ? { country: record.country } : {}),
+    ...(record.city ? { city: record.city } : {}),
+    ...(lat === undefined ? {} : { lat }),
+    ...(lon === undefined ? {} : { lon }),
+  };
+};
 
-export function createGeoLookup(lookupCountry: GeoLookup = geoIpLookup): GeoLookup {
-  const cache = new Map<string, string | undefined>();
+export function createGeoLookup(lookup: GeoResolver = geoIpLookup): GeoLookup {
+  const cache = new Map<string, GeoResult | undefined>();
   return (ip) => {
     if (cache.has(ip)) return cache.get(ip);
-    const country = isPrivateOrLoopback(ip) ? undefined : lookupCountry(ip);
+    const result = isPrivateOrLoopback(ip) ? undefined : lookup(ip);
+    const geo =
+      result === undefined
+        ? undefined
+        : typeof result === 'string'
+          ? result
+            ? { country: result }
+            : {}
+        : {
+            ...(result.country ? { country: result.country } : {}),
+            ...(result.city ? { city: result.city } : {}),
+            ...(result.lat === undefined ? {} : { lat: result.lat }),
+            ...(result.lon === undefined ? {} : { lon: result.lon }),
+          };
     if (cache.size >= CACHE_LIMIT) {
       const oldest = cache.keys().next().value;
       if (oldest !== undefined) cache.delete(oldest);
     }
-    cache.set(ip, country);
-    return country;
+    cache.set(ip, geo);
+    return geo;
   };
 }
 

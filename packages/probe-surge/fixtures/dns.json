@@ -20,6 +20,7 @@
       "domain": "push.apple.com",
       "data": ["17.57.146.20"],
       "server": "system",
+      "source": "Cache",
       "timeCost": 0.012,
       "expiresTime": 1786527400.0
     },

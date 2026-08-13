@@ -136,19 +136,29 @@ export class RequestTracker {
   }
 }
 
+const BUILTIN_POLICIES = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'REJECT-TINYGIF', 'REJECT-NO-DROP']);
+
+function canonicalPolicy(name: string): string {
+  const upper = name.toUpperCase();
+  return BUILTIN_POLICIES.has(upper) ? upper : name;
+}
+
+function isRejected(r: z.infer<typeof requestRecordSchema>): boolean {
+  return (
+    r.policyName !== undefined &&
+    canonicalPolicy(r.policyName) === 'REJECT' &&
+    (r.inBytes ?? 0) === 0 &&
+    (r.outBytes ?? 0) === 0
+  );
+}
+
 function isTerminal(r: z.infer<typeof requestRecordSchema>): boolean {
   if (r.completed === true || r.failed === true) return true;
-  if (r.policyName === 'REJECT' && (r.inBytes ?? 0) === 0 && (r.outBytes ?? 0) === 0) {
-    return true;
-  }
-  return false;
+  return isRejected(r);
 }
 
 function terminalState(r: z.infer<typeof requestRecordSchema>): FlowState {
-  if (
-    r.failed === true ||
-    (r.policyName === 'REJECT' && (r.inBytes ?? 0) === 0 && (r.outBytes ?? 0) === 0)
-  ) {
+  if (r.failed === true || isRejected(r)) {
     return 'failed';
   }
   return 'completed';
@@ -230,21 +240,47 @@ function mapDst(r: z.infer<typeof requestRecordSchema>): FlowDeltaEvent['dst'] {
 function mapAttrs(r: z.infer<typeof requestRecordSchema>): FlowDeltaEvent['attrs'] {
   const attrs: NonNullable<FlowDeltaEvent['attrs']> = {};
 
-  if (r.policyName !== undefined) attrs.policy = r.policyName;
+  if (r.policyName !== undefined) attrs.policy = canonicalPolicy(r.policyName);
+  if (r.originalPolicyName !== undefined && r.originalPolicyName !== '') {
+    const group = canonicalPolicy(r.originalPolicyName);
+    if (group !== attrs.policy) attrs.policyGroup = group;
+  }
   if (r.rule !== undefined) attrs.rule = r.rule;
   if (r.URL !== undefined) attrs.url = r.URL;
   if (r.startDate !== undefined) attrs.startedAt = Math.round(r.startDate * 1000);
 
   if (r.processPath !== undefined && r.processPath !== '') {
+    attrs.processPath = r.processPath;
     const segs = r.processPath.split(/[/\\]/).filter(Boolean);
     const last = segs[segs.length - 1];
     if (last !== undefined) attrs.process = last;
   }
 
+  if (r.remoteAddress !== undefined && /\s\(Proxy\)/i.test(r.remoteAddress)) {
+    attrs.proxied = true;
+  }
+
+  const connectMs = connectMsFromNotes(r.notes);
+  if (connectMs !== undefined) attrs.connectMs = connectMs;
+
   const chain = policyChainFromNotes(r.notes);
-  if (chain !== undefined) attrs.policyChain = chain;
+  if (chain !== undefined) attrs.policyChain = chain.map(canonicalPolicy);
 
   return attrs;
+}
+
+function connectMsFromNotes(notes: string[] | undefined): number | undefined {
+  if (notes === undefined) return undefined;
+  const re = /Connected in ([0-9.]+)\s*(ms|s)\b/i;
+  for (const note of notes) {
+    const match = re.exec(note);
+    if (match?.[1] === undefined || match[2] === undefined) continue;
+    const n = Number(match[1]);
+    if (!Number.isFinite(n)) continue;
+    const unit = match[2].toLowerCase();
+    return Math.round(unit === 's' ? n * 1000 : n);
+  }
+  return undefined;
 }
 
 function policyChainFromNotes(notes: string[] | undefined): string[] | undefined {

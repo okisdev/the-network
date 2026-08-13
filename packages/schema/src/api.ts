@@ -46,8 +46,13 @@ export interface FlowDto {
   country?: string;
   policy?: string;
   policyChain?: string[];
+  policyGroup?: string;
   rule?: string;
   process?: string;
+  processPath?: string;
+  proxied?: boolean;
+  connectMs?: number;
+  city?: string;
   startedAt?: number;
   endedAt?: number;
 }
@@ -87,6 +92,8 @@ export interface DnsLogEntry {
   qname: string;
   answers: string[];
   rttMs?: number;
+  server?: string;
+  source?: 'cache' | 'server';
 }
 
 export interface SystemLogEntry {
@@ -134,6 +141,9 @@ export interface OverviewDto {
   today: { in: number; out: number };
   activeDevices: number;
   totalDevices: number;
+  flowsActive?: number;
+  rejectedToday?: { flows: number; bytes: number };
+  dnsToday?: number;
   topDevices: Array<{ deviceId: string; name: string; rateIn: number; rateOut: number }>;
   topDestinations: Array<{ host: string; bytes: number }>;
   policySplit: Array<{ policy: string; bytes: number }>;
@@ -151,13 +161,141 @@ export interface FlowsQuery {
   policy?: string;
   state?: FlowState;
   country?: string;
+  proto?: 'tcp' | 'udp' | 'other';
+  port?: number;
+  process?: string;
+  from?: number;
+  to?: number;
   cursor?: string;
   limit?: number;
 }
 
+export type TimeseriesScope =
+  | 'wan'
+  | `device:${string}`
+  | `policy:${string}`
+  | `host:${string}`
+  | `country:${string}`;
+
 export interface TimeseriesQuery {
-  scope: 'wan' | `device:${string}`;
+  scope: TimeseriesScope;
   minutes: number;
+}
+
+export interface MultiSeriesDto {
+  key: string;
+  label: string;
+  points: TimeseriesPoint[];
+}
+
+export type BreakdownDim =
+  | 'process'
+  | 'port'
+  | 'proto'
+  | 'rule'
+  | 'policy'
+  | 'country'
+  | 'host'
+  | 'domain';
+
+export interface BreakdownRow {
+  key: string;
+  label?: string;
+  bytesIn: number;
+  bytesOut: number;
+  flows: number;
+  devices?: number;
+}
+
+export interface BreakdownDto {
+  window: { from: number; to: number; clamped: boolean };
+  rows: BreakdownRow[];
+}
+
+export interface SankeyDto {
+  nodes: Array<{ id: string; label: string; kind: 'device' | 'policy' | 'country' }>;
+  links: Array<{ source: number; target: number; bytes: number }>;
+}
+
+export interface PunchcardDto {
+  days: number;
+  max: number;
+  cells: number[][];
+}
+
+export interface DailyPoint {
+  day: string;
+  in: number;
+  out: number;
+}
+
+export interface MoverRow {
+  key: string;
+  label: string;
+  current: number;
+  previous: number;
+}
+
+export interface MoversDto {
+  devices: MoverRow[];
+  domains: MoverRow[];
+}
+
+export interface FirstSeenDto {
+  devices: Array<{ deviceId: string; name: string; firstSeenAt: number }>;
+  domains: Array<{ domain: string; firstTs: number; bytes: number; devices: number }>;
+}
+
+export interface RejectedSummaryDto {
+  series: Array<{ ts: number; flows: number }>;
+  topHosts: BreakdownRow[];
+  topDevices: BreakdownRow[];
+  topRules: BreakdownRow[];
+}
+
+export interface PresenceInterval {
+  start: number;
+  end?: number;
+}
+
+export interface DeviceDetailDto {
+  device: DeviceDto;
+  series: TimeseriesPoint[];
+  topHosts: BreakdownRow[];
+  topCountries: BreakdownRow[];
+  topProcesses: BreakdownRow[];
+  topPorts: BreakdownRow[];
+  policySplit: Array<{ policy: string; bytes: number }>;
+  presence: PresenceInterval[];
+  recentFlows: FlowDto[];
+}
+
+export interface CityPoint {
+  city: string;
+  country: string;
+  lat: number;
+  lon: number;
+  bytes: number;
+  flows: number;
+}
+
+export interface HostDetailDto {
+  host: string;
+  country?: string;
+  series: TimeseriesPoint[];
+  devices: BreakdownRow[];
+  processes: BreakdownRow[];
+  ports: BreakdownRow[];
+  recentFlows: FlowDto[];
+}
+
+export interface DnsSummaryDto {
+  series: Array<{ ts: number; count: number }>;
+  topDomains: Array<{ qname: string; count: number }>;
+  rttBuckets: Array<{ label: string; count: number }>;
+  answered: number;
+  unanswered: number;
+  resolvers: Array<{ server: string; count: number }>;
 }
 
 export interface SourceInput {
@@ -171,6 +309,7 @@ export interface SummaryPush {
   wan: { rateIn: number; rateOut: number };
   today: { in: number; out: number };
   activeDevices: number;
+  flowsActive?: number;
 }
 
 export interface DeviceRatePush {

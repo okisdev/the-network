@@ -31,10 +31,14 @@ export const flowDeltaEventSchema = z.object({
     .object({
       policy: z.string().optional(),
       policyChain: z.array(z.string()).optional(),
+      policyGroup: z.string().optional(),
       rule: z.string().optional(),
       process: z.string().optional(),
+      processPath: z.string().optional(),
       url: z.string().optional(),
       startedAt: z.number().optional(),
+      proxied: z.boolean().optional(),
+      connectMs: z.number().optional(),
     })
     .optional(),
 });
@@ -47,6 +51,8 @@ export const dnsEventSchema = z.object({
   qname: z.string(),
   answers: z.array(z.string()),
   rttMs: z.number().optional(),
+  server: z.string().optional(),
+  source: z.enum(['cache', 'server']).optional(),
 });
 export type DnsEvent = z.infer<typeof dnsEventSchema>;
 

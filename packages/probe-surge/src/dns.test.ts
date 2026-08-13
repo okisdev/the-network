@@ -15,13 +15,29 @@ describe('mapDnsCache', () => {
       qname: 'claude.ai',
       answers: ['160.79.104.10'],
       rttMs: 23,
+      server: 'https://223.5.5.5/dns-query',
+      source: 'server',
     });
     expect(events[1]?.rttMs).toBe(8);
+    expect(events[1]?.server).toBe('223.5.5.5');
+    expect(events[1]?.source).toBe('server');
+    expect(events[2]?.server).toBe('system');
+    expect(events[2]?.source).toBe('cache');
     expect(events[3]).toMatchObject({
       qname: 'no-answers.example',
       answers: [],
       rttMs: 500,
     });
+    expect(events[3]?.server).toBe('223.5.5.5');
+    expect(events[3]?.source).toBeUndefined();
+  });
+
+  it('passes server through and maps source Server/Cache', () => {
+    const events = mapDnsCache(fixture, NOW);
+    expect(events[0]?.server).toBe('https://223.5.5.5/dns-query');
+    expect(events[0]?.source).toBe('server');
+    expect(events[2]?.source).toBe('cache');
+    expect(events[3]?.source).toBeUndefined();
   });
 
   it('skips entries without a domain and defaults missing answers to empty', () => {

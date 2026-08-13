@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDatabase } from './db.ts';
+import type { GeoLookup } from './geo.ts';
 import { Identity } from './identity.ts';
 import { Pipeline } from './pipeline.ts';
 import { Store } from './store.ts';
@@ -16,14 +17,18 @@ describe('Pipeline', () => {
   let store: Store;
   let pipeline: Pipeline;
   let now: number;
-  let geoLookup: ReturnType<typeof vi.fn<(ip: string) => string | undefined>>;
+  let geoLookup: ReturnType<typeof vi.fn<GeoLookup>>;
 
   beforeEach(() => {
     now = NOW;
     dataDir = mkdtempSync(join(tmpdir(), 'the-network-hub-pipeline-'));
     db = openDatabase(dataDir);
     store = new Store(db, () => now);
-    geoLookup = vi.fn((ip: string) => (ip === '8.8.8.8' ? 'US' : undefined));
+    geoLookup = vi.fn((ip: string) =>
+      ip === '8.8.8.8'
+        ? { country: 'US', city: 'Mountain View', lat: 37.386, lon: -122.0838 }
+        : undefined,
+    );
     pipeline = new Pipeline(store, new Identity(store), {
       autoStart: false,
       now: () => now,
@@ -70,6 +75,77 @@ describe('Pipeline', () => {
     expect(store.timeseries(`device:${flow!.deviceId}`, 1, now)).toEqual([
       { ts: Math.floor(now / 60_000) * 60_000, in: 150 / 60, out: 30 / 60 },
     ]);
+  });
+
+  it('keeps the first flow attributes and counts active flows', () => {
+    pipeline.ingest('source-1', [
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-attrs',
+        device: { mac: '00:11:22:33:44:77', name: 'Desktop' },
+        dst: { ip: '8.8.8.8', proto: 'tcp' },
+        bytesIn: 10,
+        bytesOut: 5,
+        state: 'active',
+        attrs: {
+          policyGroup: 'Primary',
+          processPath: '/Applications/First.app/First',
+          proxied: true,
+          connectMs: 42,
+        },
+      },
+    ]);
+    expect(pipeline.activeFlowCount()).toBe(1);
+
+    now += 1_000;
+    pipeline.ingest('source-1', [
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-attrs',
+        device: { mac: '00:11:22:33:44:77' },
+        dst: { ip: '1.1.1.1', proto: 'tcp' },
+        bytesIn: 20,
+        bytesOut: 10,
+        state: 'completed',
+        attrs: {
+          policyGroup: 'Later',
+          processPath: '/Applications/Later.app/Later',
+          proxied: false,
+          connectMs: 99,
+        },
+      },
+    ]);
+    expect(pipeline.activeFlowCount()).toBe(0);
+    expect(pipeline.recentFlowDtos()).toEqual([
+      expect.objectContaining({
+        id: 'flow-attrs',
+        policyGroup: 'Primary',
+        processPath: '/Applications/First.app/First',
+        proxied: true,
+        connectMs: 42,
+        country: 'US',
+        city: 'Mountain View',
+      }),
+    ]);
+
+    pipeline.flush();
+
+    expect(store.listFlows().flows[0]).toMatchObject({
+      id: 'flow-attrs',
+      policyGroup: 'Primary',
+      processPath: '/Applications/First.app/First',
+      proxied: true,
+      connectMs: 42,
+      country: 'US',
+      city: 'Mountain View',
+    });
+    expect(db.prepare('SELECT lat, lon FROM flows WHERE id = ?').get('flow-attrs')).toEqual({
+      lat: 37.386,
+      lon: -122.0838,
+    });
+    expect(geoLookup).toHaveBeenCalledTimes(1);
   });
 
   it('uses a presence mac and ip binding for later ip-only flows', () => {
@@ -215,5 +291,60 @@ describe('Pipeline', () => {
     expect(points[0]).toMatchObject({ in: 55 / 60, out: 65 / 60 });
     expect(points[0]!.in).toBeGreaterThanOrEqual(0);
     expect(points[0]!.out).toBeGreaterThanOrEqual(0);
+  });
+
+  it('records presence changes on flush ticks', () => {
+    const firstTick = now;
+    pipeline.ingest('source-1', [
+      {
+        kind: 'presence',
+        ts: now,
+        device: { mac: 'AA:BB:CC:DD:EE:10', name: 'Watch' },
+        event: 'seen',
+      },
+    ]);
+    const deviceId = store.listDevices(now)[0]!.id;
+    pipeline.flush();
+
+    now += 120_001;
+    pipeline.flush();
+    now += 1;
+    pipeline.ingest('source-1', [
+      {
+        kind: 'presence',
+        ts: now,
+        device: { mac: 'AA:BB:CC:DD:EE:10', name: 'Watch' },
+        event: 'seen',
+      },
+    ]);
+    pipeline.flush();
+
+    expect(store.listPresence(deviceId, firstTick - 1, now + 1)).toEqual([
+      { start: firstTick, end: firstTick + 120_001 },
+      { start: firstTick + 120_002 },
+    ]);
+  });
+
+  it('persists and emits DNS resolver fields', () => {
+    const listener = vi.fn();
+    pipeline.onDns(listener);
+
+    pipeline.ingest('source-1', [
+      {
+        kind: 'dns',
+        ts: now,
+        device: {},
+        qname: 'example.com',
+        answers: ['93.184.216.34'],
+        rttMs: 8,
+        server: '1.1.1.1',
+        source: 'cache',
+      },
+    ]);
+
+    expect(store.listDnsLog().entries[0]).toMatchObject({ server: '1.1.1.1', source: 'cache' });
+    expect(listener).toHaveBeenCalledWith([
+      expect.objectContaining({ server: '1.1.1.1', source: 'cache' }),
+    ]);
   });
 });

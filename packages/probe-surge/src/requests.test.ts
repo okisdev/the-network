@@ -25,16 +25,28 @@ describe('RequestTracker', () => {
       '🇯🇵 JP',
       'Oracle-JP',
     ]);
+    expect(byId['surge:101']?.attrs?.policyGroup).toBe('AI Suite');
+    expect(byId['surge:101']?.attrs?.proxied).toBe(true);
+    expect(byId['surge:101']?.attrs?.connectMs).toBe(88);
 
     expect(byId['surge:102']?.bytesIn).toBe(8123);
     expect(byId['surge:102']?.bytesOut).toBe(4021);
     expect(byId['surge:102']?.state).toBe('active');
+    expect(byId['surge:102']?.attrs?.policyGroup).toBeUndefined();
+    expect(byId['surge:102']?.attrs?.proxied).toBeUndefined();
+    expect(byId['surge:102']?.attrs?.connectMs).toBeUndefined();
 
     expect(byId['surge:103']?.bytesIn).toBe(941233);
     expect(byId['surge:103']?.bytesOut).toBe(51200);
     expect(byId['surge:103']?.state).toBe('completed');
     expect(byId['surge:103']?.device.ip).toBe('127.0.0.1');
     expect(byId['surge:103']?.attrs?.process).toBe('ghostty');
+    expect(byId['surge:103']?.attrs?.processPath).toBe(
+      '/Applications/Ghostty.app/Contents/MacOS/ghostty',
+    );
+    expect(byId['surge:103']?.attrs?.policyGroup).toBe('🇯🇵 JP');
+    expect(byId['surge:103']?.attrs?.proxied).toBe(true);
+    expect(byId['surge:103']?.attrs?.connectMs).toBeUndefined();
 
     expect(byId['surge:104']?.bytesIn).toBe(220);
     expect(byId['surge:104']?.bytesOut).toBe(180);
@@ -42,6 +54,9 @@ describe('RequestTracker', () => {
     expect(byId['surge:104']?.dst.host).toBeUndefined();
     expect(byId['surge:104']?.dst.proto).toBe('udp');
     expect(byId['surge:104']?.state).toBe('active');
+    expect(byId['surge:104']?.attrs?.policyGroup).toBeUndefined();
+    expect(byId['surge:104']?.attrs?.proxied).toBeUndefined();
+    expect(byId['surge:104']?.attrs?.processPath).toBeUndefined();
 
     expect(byId['surge:105']?.bytesIn).toBe(0);
     expect(byId['surge:105']?.bytesOut).toBe(0);
@@ -148,5 +163,62 @@ describe('RequestTracker', () => {
       2_000,
     );
     expect(fake[0]!.device).toEqual({});
+  });
+
+  it('maps policyGroup, proxied, connectMs, and processPath from fixture fields', () => {
+    const tracker = new RequestTracker();
+    const events = tracker.ingest(fixture, NOW);
+    const byId = Object.fromEntries(events.map((e) => [e.flowId, e]));
+
+    expect(byId['surge:101']?.attrs?.policyGroup).toBe('AI Suite');
+    expect(byId['surge:101']?.attrs?.proxied).toBe(true);
+    expect(byId['surge:101']?.attrs?.connectMs).toBe(88);
+
+    expect(byId['surge:102']?.attrs?.policyGroup).toBeUndefined();
+    expect(byId['surge:102']?.attrs?.proxied).toBeUndefined();
+
+    expect(byId['surge:103']?.attrs?.process).toBe('ghostty');
+    expect(byId['surge:103']?.attrs?.processPath).toBe(
+      '/Applications/Ghostty.app/Contents/MacOS/ghostty',
+    );
+    expect(byId['surge:103']?.attrs?.proxied).toBe(true);
+
+    expect(byId['surge:104']?.attrs?.proxied).toBeUndefined();
+    expect(byId['surge:105']?.attrs?.policyGroup).toBeUndefined();
+  });
+
+  it('canonicalizes builtin policy casing across policy, group, chain, and reject detection', () => {
+    const tracker = new RequestTracker();
+    const events = tracker.ingest(
+      {
+        requests: [
+          {
+            id: 910,
+            remoteHost: 'c.example:443',
+            sourceAddress: '192.168.31.5',
+            policyName: 'Direct',
+            originalPolicyName: 'direct',
+            notes: ['[Rule] Policy decision path: Proxy Group -> Direct'],
+            inBytes: 3,
+            outBytes: 2,
+          },
+          {
+            id: 911,
+            remoteHost: 'd.example:443',
+            sourceAddress: '192.168.31.5',
+            policyName: 'Reject',
+            inBytes: 0,
+            outBytes: 0,
+          },
+        ],
+      },
+      1_000,
+    );
+    const byId = Object.fromEntries(events.map((e) => [e.flowId, e]));
+    expect(byId['surge:910']?.attrs?.policy).toBe('DIRECT');
+    expect(byId['surge:910']?.attrs?.policyGroup).toBeUndefined();
+    expect(byId['surge:910']?.attrs?.policyChain).toEqual(['Proxy Group', 'DIRECT']);
+    expect(byId['surge:911']?.attrs?.policy).toBe('REJECT');
+    expect(byId['surge:911']?.state).toBe('failed');
   });
 });

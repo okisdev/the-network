@@ -1,7 +1,15 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ProbeAdapter, SourceDto } from '@the-network/schema';
+import type {
+  CityPoint,
+  DeviceDetailDto,
+  DnsSummaryDto,
+  FlowsPage,
+  HostDetailDto,
+  ProbeAdapter,
+  SourceDto,
+} from '@the-network/schema';
 import type Database from 'better-sqlite3';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -157,6 +165,9 @@ describe('Hub API', () => {
       today: { in: 400, out: 100 },
       activeDevices: 1,
       totalDevices: 1,
+      flowsActive: 1,
+      rejectedToday: { flows: 0, bytes: 0 },
+      dnsToday: 0,
       topDevices: [
         { deviceId: expect.any(String), name: 'Laptop', rateIn: expect.any(Number), rateOut: expect.any(Number) },
       ],
@@ -235,6 +246,189 @@ describe('Hub API', () => {
     });
   });
 
+  it('filters flows by extended fields and keeps keyset pagination inside the filtered set', async () => {
+    const now = Date.now();
+    store.upsertDevice({
+      id: 'device-1',
+      name: 'Laptop',
+      firstSeenAt: now - 60_000,
+      lastSeenAt: now,
+    });
+    store.writeFlush({
+      flows: [
+        {
+          id: 'tcp-new',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 10_000,
+          port: 443,
+          proto: 'tcp',
+          process: 'Browser',
+          bytesIn: 1,
+          bytesOut: 1,
+          state: 'completed',
+        },
+        {
+          id: 'udp-new',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 15_000,
+          port: 53,
+          proto: 'udp',
+          process: 'Resolver',
+          bytesIn: 1,
+          bytesOut: 1,
+          state: 'completed',
+        },
+        {
+          id: 'tcp-middle',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 20_000,
+          port: 443,
+          proto: 'tcp',
+          process: 'Browser',
+          bytesIn: 1,
+          bytesOut: 1,
+          state: 'completed',
+        },
+        {
+          id: 'other-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 25_000,
+          port: 443,
+          proto: 'other',
+          process: 'Browser',
+          bytesIn: 1,
+          bytesOut: 1,
+          state: 'completed',
+        },
+        {
+          id: 'tcp-old',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 30_000,
+          port: 443,
+          proto: 'tcp',
+          process: 'Browser',
+          bytesIn: 1,
+          bytesOut: 1,
+          state: 'completed',
+        },
+      ],
+    });
+    const ids = async (query: string): Promise<string[]> => {
+      const response = await app.inject({ method: 'GET', url: `/api/flows?${query}` });
+      expect(response.statusCode).toBe(200);
+      return response.json<FlowsPage>().flows.map((flow) => flow.id);
+    };
+
+    expect(await ids('proto=udp')).toEqual(['udp-new']);
+    expect(await ids('port=53')).toEqual(['udp-new']);
+    expect(await ids('process=Resolver')).toEqual(['udp-new']);
+    expect(await ids(`from=${now - 20_000}`)).toEqual(['tcp-new', 'udp-new', 'tcp-middle']);
+    expect(await ids(`to=${now - 25_000}`)).toEqual(['other-flow', 'tcp-old']);
+
+    const query = `proto=tcp&port=443&process=Browser&from=${now - 30_000}&to=${now - 10_000}&limit=2`;
+    const first = await app.inject({ method: 'GET', url: `/api/flows?${query}` });
+    const firstPage = first.json<FlowsPage>();
+    expect(firstPage.flows.map((flow) => flow.id)).toEqual(['tcp-new', 'tcp-middle']);
+    expect(firstPage.nextCursor).toBeTypeOf('string');
+    const second = await app.inject({
+      method: 'GET',
+      url: `/api/flows?${query}&cursor=${encodeURIComponent(firstPage.nextCursor!)}`,
+    });
+    expect(second.json<FlowsPage>()).toEqual({
+      flows: [expect.objectContaining({ id: 'tcp-old' })],
+    });
+  });
+
+  it('returns device detail from rollups, flow breakdowns, and presence', async () => {
+    const now = Date.now();
+    store.upsertDevice({
+      id: 'device-detail',
+      name: 'Laptop',
+      firstSeenAt: now - 3_600_000,
+      lastSeenAt: now,
+    });
+    store.bindDeviceIp('device-detail', '192.168.1.10', now);
+    store.openPresence('device-detail', now - 120_000);
+    store.closePresence('device-detail', now - 60_000);
+    store.writeFlush({
+      flows: [
+        {
+          id: 'detail-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-detail',
+          ts: now - 10_000,
+          host: 'api.example.com',
+          port: 443,
+          proto: 'tcp',
+          process: 'Browser',
+          bytesIn: 120,
+          bytesOut: 30,
+          state: 'completed',
+          policy: 'Proxy',
+          country: 'US',
+        },
+        {
+          id: 'detail-unclassified',
+          sourceId: 'source-1',
+          deviceId: 'device-detail',
+          ts: now - 20_000,
+          bytesIn: 10,
+          bytesOut: 5,
+          state: 'completed',
+        },
+      ],
+      rollups: [
+        { ts: now, scope: 'device_host', key: 'device-detail|rollup.example', bytesIn: 900, bytesOut: 100, flows: 4 },
+        { ts: now, scope: 'device_country', key: 'device-detail|SG', bytesIn: 700, bytesOut: 100, flows: 3 },
+      ],
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/devices/device-detail/detail?minutes=5',
+    });
+    expect(response.statusCode).toBe(200);
+    const detail = response.json<DeviceDetailDto>();
+    expect(detail.device).toMatchObject({
+      id: 'device-detail',
+      name: 'Laptop',
+      ips: ['192.168.1.10'],
+      online: true,
+      rateIn: 0,
+      rateOut: 0,
+    });
+    expect(detail.series).toHaveLength(5);
+    expect(detail.topHosts).toEqual([
+      { key: 'rollup.example', bytesIn: 900, bytesOut: 100, flows: 4 },
+      { key: 'example.com', bytesIn: 120, bytesOut: 30, flows: 1 },
+    ]);
+    expect(detail.topCountries).toEqual([
+      { key: 'SG', bytesIn: 700, bytesOut: 100, flows: 3 },
+      { key: 'US', bytesIn: 120, bytesOut: 30, flows: 1 },
+    ]);
+    expect(detail.topProcesses).toEqual([
+      { key: 'Browser', bytesIn: 120, bytesOut: 30, flows: 1, devices: 1 },
+    ]);
+    expect(detail.topPorts).toEqual([
+      { key: '443', bytesIn: 120, bytesOut: 30, flows: 1, devices: 1 },
+    ]);
+    expect(detail.policySplit).toEqual([{ policy: 'Proxy', bytes: 150 }]);
+    expect(detail.presence).toEqual([{ start: now - 120_000, end: now - 60_000 }]);
+    expect(detail.recentFlows.map((flow) => flow.id)).toEqual(['detail-flow', 'detail-unclassified']);
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/devices/missing/detail?minutes=5',
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ message: 'Device not found' });
+  });
+
   it('returns ordered destinations and country device shares', async () => {
     const now = Date.now();
     pipeline.ingest('source-1', [
@@ -299,6 +493,145 @@ describe('Hub API', () => {
     ]);
   });
 
+  it('returns geo-complete cities and host details with subdomain matches', async () => {
+    const now = Date.now();
+    for (const [id, name] of [
+      ['device-1', 'Laptop'],
+      ['device-2', 'Phone'],
+    ] as const) {
+      store.upsertDevice({ id, name, firstSeenAt: now - 60_000, lastSeenAt: now });
+    }
+    store.writeFlush({
+      flows: [
+        {
+          id: 'host-exact',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 30_000,
+          host: 'example.com',
+          port: 443,
+          process: 'Browser',
+          bytesIn: 80,
+          bytesOut: 20,
+          state: 'completed',
+          country: 'US',
+          city: 'Singapore',
+          lat: 1,
+          lon: 103,
+        },
+        {
+          id: 'host-subdomain',
+          sourceId: 'source-1',
+          deviceId: 'device-2',
+          ts: now - 20_000,
+          host: 'x.example.com',
+          port: 8443,
+          process: 'Agent',
+          bytesIn: 280,
+          bytesOut: 20,
+          state: 'completed',
+          country: 'CA',
+          city: 'Toronto',
+          lat: 43,
+          lon: -79,
+        },
+        {
+          id: 'host-subdomain-2',
+          sourceId: 'source-1',
+          deviceId: 'device-2',
+          ts: now - 10_000,
+          host: 'y.example.com',
+          port: 8443,
+          process: 'Agent',
+          bytesIn: 80,
+          bytesOut: 20,
+          state: 'completed',
+          country: 'CA',
+          city: 'Toronto',
+          lat: 45,
+          lon: -81,
+        },
+        {
+          id: 'host-boundary',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          host: 'notexample.com',
+          bytesIn: 1_000,
+          bytesOut: 0,
+          state: 'completed',
+          country: 'GB',
+          city: 'London',
+          lat: 51.5,
+          lon: -0.1,
+        },
+        {
+          id: 'missing-geo',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          bytesIn: 500,
+          bytesOut: 0,
+          state: 'completed',
+          country: 'ZZ',
+          city: 'Nowhere',
+        },
+        {
+          id: 'missing-country',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          bytesIn: 500,
+          bytesOut: 0,
+          state: 'completed',
+          city: 'Unknown',
+          lat: 1,
+          lon: 2,
+        },
+      ],
+    });
+
+    const citiesResponse = await app.inject({
+      method: 'GET',
+      url: '/api/destinations/cities?minutes=5',
+    });
+    expect(citiesResponse.statusCode).toBe(200);
+    expect(citiesResponse.json<CityPoint[]>()).toEqual([
+      { city: 'London', country: 'GB', lat: 51.5, lon: -0.1, bytes: 1_000, flows: 1 },
+      { city: 'Toronto', country: 'CA', lat: 44, lon: -80, bytes: 400, flows: 2 },
+      { city: 'Singapore', country: 'US', lat: 1, lon: 103, bytes: 100, flows: 1 },
+    ]);
+
+    const hostResponse = await app.inject({
+      method: 'GET',
+      url: '/api/hosts/example.com?minutes=5',
+    });
+    expect(hostResponse.statusCode).toBe(200);
+    const detail = hostResponse.json<HostDetailDto>();
+    expect(detail).toMatchObject({
+      host: 'example.com',
+      country: 'CA',
+      devices: [
+        { key: 'device-2', label: 'Phone', bytesIn: 360, bytesOut: 40, flows: 2, devices: 1 },
+        { key: 'device-1', label: 'Laptop', bytesIn: 80, bytesOut: 20, flows: 1, devices: 1 },
+      ],
+      processes: [
+        { key: 'Agent', bytesIn: 360, bytesOut: 40, flows: 2, devices: 1 },
+        { key: 'Browser', bytesIn: 80, bytesOut: 20, flows: 1, devices: 1 },
+      ],
+      ports: [
+        { key: '8443', bytesIn: 360, bytesOut: 40, flows: 2, devices: 1 },
+        { key: '443', bytesIn: 80, bytesOut: 20, flows: 1, devices: 1 },
+      ],
+    });
+    expect(detail.series).toHaveLength(5);
+    expect(detail.recentFlows.map((flow) => flow.id)).toEqual([
+      'host-subdomain-2',
+      'host-subdomain',
+      'host-exact',
+    ]);
+  });
+
   it('persists ingested dns batches and exposes pagination and search', async () => {
     const now = Date.now();
     pipeline.ingest('source-1', [
@@ -351,6 +684,41 @@ describe('Hub API', () => {
     });
   });
 
+  it('returns zero-filled DNS summary buckets and ranked resolver statistics', async () => {
+    const now = Date.now();
+    for (const entry of [
+      { id: 'dns-1', ts: now - 1_000, qname: 'alpha.example', answers: ['1.1.1.1'], rttMs: 5, server: '1.1.1.1' },
+      { id: 'dns-2', ts: now - 10_000, qname: 'alpha.example', answers: [], rttMs: 25, server: '1.1.1.1' },
+      { id: 'dns-3', ts: now - 61_000, qname: 'beta.example', answers: ['2.2.2.2'], rttMs: 75, server: '1.1.1.1' },
+      { id: 'dns-4', ts: now - 121_000, qname: 'gamma.example', answers: [], rttMs: 150, server: '8.8.8.8' },
+      { id: 'dns-5', ts: now - 181_000, qname: 'delta.example', answers: [], rttMs: 350, server: '8.8.8.8' },
+    ]) {
+      store.appendDnsLog(entry);
+    }
+
+    const response = await app.inject({ method: 'GET', url: '/api/dns/summary?minutes=5' });
+    expect(response.statusCode).toBe(200);
+    const summary = response.json<DnsSummaryDto>();
+    expect(summary.series).toHaveLength(5);
+    expect(summary.series.reduce((total, point) => total + point.count, 0)).toBe(5);
+    expect(summary.topDomains[0]).toEqual({ qname: 'alpha.example', count: 2 });
+    expect(summary.rttBuckets).toEqual([
+      { label: '<10ms', count: 1 },
+      { label: '10-50ms', count: 1 },
+      { label: '50-100ms', count: 1 },
+      { label: '100-300ms', count: 1 },
+      { label: '300ms+', count: 1 },
+    ]);
+    expect(summary).toMatchObject({
+      answered: 2,
+      unanswered: 3,
+      resolvers: [
+        { server: '1.1.1.1', count: 3 },
+        { server: '8.8.8.8', count: 2 },
+      ],
+    });
+  });
+
   it('filters system logs by level and search', async () => {
     const now = Date.now();
     store.appendSystemLog({
@@ -393,6 +761,211 @@ describe('Hub API', () => {
     expect(points).toHaveLength(7);
     expect(points.every((point) => point.in === 0 && point.out === 0)).toBe(true);
     expect(points[1]!.ts - points[0]!.ts).toBe(60_000);
+  });
+
+  it('serves every aggregate read endpoint with ranked and zero-filled data', async () => {
+    const now = Date.now();
+    const currentMinute = Math.floor(now / 60_000) * 60_000;
+    for (const [id, name] of [
+      ['device-1', 'Laptop'],
+      ['device-2', 'Phone'],
+      ['device-3', 'Tablet'],
+    ] as const) {
+      store.upsertDevice({
+        id,
+        name,
+        firstSeenAt: now - 60_000,
+        lastSeenAt: now,
+      });
+    }
+    store.writeFlush({
+      flows: [
+        {
+          id: 'failed-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: currentMinute,
+          host: 'api.example.com',
+          port: 443,
+          proto: 'tcp',
+          bytesIn: 500,
+          bytesOut: 100,
+          state: 'failed',
+          policy: 'Proxy',
+          rule: 'Rule A',
+          process: 'Browser',
+          country: 'US',
+        },
+        {
+          id: 'policy-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-2',
+          ts: currentMinute - 60_000,
+          host: 'cdn.example.com',
+          port: 443,
+          proto: 'tcp',
+          bytesIn: 250,
+          bytesOut: 50,
+          state: 'completed',
+          policy: 'reject-drop',
+          rule: 'Rule B',
+          process: 'Agent',
+          country: 'CA',
+        },
+        {
+          id: 'other-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-3',
+          ts: currentMinute,
+          host: 'service.other.net',
+          port: 53,
+          proto: 'udp',
+          bytesIn: 100,
+          bytesOut: 20,
+          state: 'completed',
+          policy: 'Direct',
+          rule: 'Rule C',
+          process: 'Resolver',
+          country: 'GB',
+        },
+      ],
+      rollups: [
+        { ts: now, scope: 'wan', key: '', bytesIn: 120, bytesOut: 30 },
+        { ts: now - 86_400_000, scope: 'wan', key: '', bytesIn: 40, bytesOut: 10 },
+      ],
+    });
+
+    const multiResponse = await app.inject({
+      method: 'GET',
+      url: '/api/timeseries/multi?scope=device&minutes=3&limit=2',
+    });
+    expect(multiResponse.statusCode).toBe(200);
+    const multi = multiResponse.json<Array<{ key: string; label: string; points: unknown[] }>>();
+    expect(multi.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: 'device-1', label: 'Laptop' },
+      { key: 'device-2', label: 'Phone' },
+      { key: 'other', label: 'Other' },
+    ]);
+    expect(multi.every((series) => series.points.length === 3)).toBe(true);
+
+    const breakdownResponse = await app.inject({
+      method: 'GET',
+      url: '/api/breakdown?dim=domain&minutes=525600',
+    });
+    expect(breakdownResponse.statusCode).toBe(200);
+    expect(breakdownResponse.json()).toMatchObject({
+      window: { from: expect.any(Number), to: expect.any(Number), clamped: true },
+      rows: [
+        { key: 'example.com', bytesIn: 750, bytesOut: 150, flows: 2, devices: 2 },
+        { key: 'other.net', bytesIn: 100, bytesOut: 20, flows: 1, devices: 1 },
+      ],
+    });
+
+    const sankeyResponse = await app.inject({ method: 'GET', url: '/api/sankey?minutes=60&limit=1' });
+    expect(sankeyResponse.statusCode).toBe(200);
+    const sankey = sankeyResponse.json<{
+      nodes: Array<{ kind: string }>;
+      links: Array<{ source: number; target: number; bytes: number }>;
+    }>();
+    expect(sankey.nodes.filter((node) => node.kind === 'device')).toHaveLength(2);
+    expect(sankey.nodes.filter((node) => node.kind === 'policy')).toHaveLength(2);
+    expect(sankey.nodes.filter((node) => node.kind === 'country')).toHaveLength(2);
+    expect(sankey.links.every((link) => link.bytes > 0)).toBe(true);
+    expect(
+      sankey.links.every(
+        (link) =>
+          link.source >= 0 &&
+          link.source < sankey.nodes.length &&
+          link.target >= 0 &&
+          link.target < sankey.nodes.length,
+      ),
+    ).toBe(true);
+
+    const punchcardResponse = await app.inject({ method: 'GET', url: '/api/insights/punchcard?days=2' });
+    expect(punchcardResponse.statusCode).toBe(200);
+    expect(punchcardResponse.json()).toMatchObject({
+      days: 2,
+      max: 150,
+      cells: expect.arrayContaining([expect.any(Array)]),
+    });
+
+    const dailyResponse = await app.inject({ method: 'GET', url: '/api/insights/daily?days=2' });
+    expect(dailyResponse.statusCode).toBe(200);
+    const daily = dailyResponse.json<Array<{ day: string; in: number; out: number }>>();
+    expect(daily).toHaveLength(2);
+    expect(daily[0]).toMatchObject({ in: 40, out: 10 });
+    expect(daily[1]).toMatchObject({ in: 120, out: 30 });
+    expect(daily[0]!.day < daily[1]!.day).toBe(true);
+
+    const moversResponse = await app.inject({ method: 'GET', url: '/api/insights/movers?minutes=1' });
+    expect(moversResponse.statusCode).toBe(200);
+    expect(moversResponse.json()).toMatchObject({
+      devices: [
+        { key: 'device-1', label: 'Laptop', current: 600, previous: 0 },
+        { key: 'device-2', label: 'Phone', current: 0, previous: 300 },
+        { key: 'device-3', label: 'Tablet', current: 120, previous: 0 },
+      ],
+      domains: [
+        expect.objectContaining({ key: 'example.com', current: 600, previous: 300 }),
+        expect.objectContaining({ key: 'other.net', current: 120, previous: 0 }),
+      ],
+    });
+
+    const firstSeenResponse = await app.inject({ method: 'GET', url: '/api/insights/firstseen' });
+    expect(firstSeenResponse.statusCode).toBe(200);
+    expect(firstSeenResponse.json()).toMatchObject({
+      devices: expect.arrayContaining([
+        { deviceId: 'device-1', name: 'Laptop', firstSeenAt: now - 60_000 },
+      ]),
+      domains: expect.arrayContaining([
+        { domain: 'example.com', firstTs: currentMinute - 60_000, bytes: 900, devices: 2 },
+      ]),
+    });
+
+    const rejectedResponse = await app.inject({
+      method: 'GET',
+      url: '/api/insights/rejected?minutes=3',
+    });
+    expect(rejectedResponse.statusCode).toBe(200);
+    const rejected = rejectedResponse.json<{
+      series: Array<{ flows: number }>;
+      topHosts: Array<{ key: string }>;
+      topDevices: Array<{ key: string; label: string }>;
+      topRules: Array<{ key: string }>;
+    }>();
+    expect(rejected.series).toHaveLength(3);
+    expect(rejected.series.reduce((sum, point) => sum + point.flows, 0)).toBe(2);
+    expect(rejected.topHosts.map((row) => row.key)).toEqual(['api.example.com', 'cdn.example.com']);
+    expect(rejected.topDevices).toEqual([
+      expect.objectContaining({ key: 'device-1', label: 'Laptop' }),
+      expect.objectContaining({ key: 'device-2', label: 'Phone' }),
+    ]);
+    expect(rejected.topRules.map((row) => row.key)).toEqual(['Rule A', 'Rule B']);
+  });
+
+  it('validates aggregate read query limits and windows', async () => {
+    const urls = [
+      '/api/flows?proto=icmp',
+      '/api/flows?port=1.5',
+      '/api/flows?process=',
+      '/api/flows?from=nope',
+      '/api/devices/device-1/detail?minutes=0',
+      '/api/destinations/cities?minutes=0',
+      '/api/hosts/example.com?minutes=0',
+      '/api/dns/summary?minutes=0',
+      '/api/timeseries/multi?scope=device&minutes=1&limit=13',
+      '/api/breakdown?dim=nope&minutes=1',
+      '/api/sankey?minutes=0',
+      '/api/insights/punchcard?days=91',
+      '/api/insights/daily?days=61',
+      '/api/insights/movers?minutes=525601',
+      '/api/insights/firstseen?days=31',
+      '/api/insights/rejected?minutes=0',
+    ];
+    for (const url of urls) {
+      const response = await app.inject({ method: 'GET', url });
+      expect(response.statusCode, url).toBe(400);
+    }
   });
 
   it('serves Next.js static export routes, assets, SPA 404, and keeps API JSON 404', async () => {
