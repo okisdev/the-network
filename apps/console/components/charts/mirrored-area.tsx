@@ -29,12 +29,14 @@ export function MirroredAreaChart({
   className,
   onZoom,
   axes = true,
+  fill = false,
 }: {
   points: TimeseriesPoint[];
   height?: number;
   className?: string;
   onZoom?: (from: number, to: number) => void;
   axes?: boolean;
+  fill?: boolean;
 }) {
   const mounted = useMounted();
   const downloadGradient = useId().replaceAll(":", "");
@@ -45,7 +47,10 @@ export function MirroredAreaChart({
   if (points.length === 0) return null;
   if (!mounted) {
     return (
-      <div className={className} style={{ height }}>
+      <div
+        className={cn(fill && "min-h-52 flex-1", className)}
+        style={fill ? undefined : { height }}
+      >
         <Skeleton className="h-full w-full" />
       </div>
     );
@@ -85,8 +90,13 @@ export function MirroredAreaChart({
   return (
     <div
       ref={containerRef}
-      className={cn("relative w-full select-none", onZoom && "cursor-crosshair", className)}
-      style={{ height }}
+      className={cn(
+        "relative w-full select-none",
+        fill && "min-h-52 flex-1",
+        onZoom && "cursor-crosshair",
+        className,
+      )}
+      style={fill ? undefined : { height }}
       onPointerCancel={() => setSelection(null)}
       onPointerDown={(event) => {
         if (!onZoom || event.button !== 0) return;
@@ -124,7 +134,8 @@ export function MirroredAreaChart({
         setSelection(null);
       }}
     >
-      <ResponsiveContainer width="100%" height="100%">
+      <div className={fill ? "absolute inset-0" : "h-full w-full"}>
+        <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
           margin={axes ? { top: 4, right: 4, bottom: 0, left: 0 } : { top: 2, right: 0, bottom: 2, left: 0 }}
@@ -184,7 +195,8 @@ export function MirroredAreaChart({
             type="monotone"
           />
         </AreaChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
       {selection && selectionWidth > 0 && (
         <div
           className="bg-primary/10 border-border pointer-events-none absolute top-1 bottom-6 border-x"

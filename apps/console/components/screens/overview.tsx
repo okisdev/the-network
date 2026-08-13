@@ -22,7 +22,7 @@ import { StatusDot, type StatusTone } from "@/components/ui/status-dot";
 import { useLive } from "@/contexts/live-provider";
 import { useTimeRange } from "@/contexts/timerange-provider";
 import { api } from "@/lib/api";
-import { colorForKey, policyColor } from "@/lib/chart-colors";
+import { CHART_SLOTS, colorForKey, policyColor } from "@/lib/chart-colors";
 import { formatBytes, formatRate, formatTime, formatTimeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -183,7 +183,6 @@ export function OverviewScreen() {
           key: device.deviceId,
           label: device.name,
           value: (rate?.rateIn ?? device.rateIn) + (rate?.rateOut ?? device.rateOut),
-          color: colorForKey(device.deviceId),
         };
       }),
     [live.deviceRates, overviewTopDevices],
@@ -308,54 +307,30 @@ export function OverviewScreen() {
           valueClassName={cn(rejectedTodayFlows > 0 && "text-destructive")}
         />
 
-        <Card className="col-span-12 xl:col-span-8 [&>div]:flex [&>div]:min-h-0 [&>div]:flex-col">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-            <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-              <div>
-                <div className="text-muted-foreground text-xs">Download</div>
-                {initialSummaryLoading ? (
-                  <Skeleton className="mt-1 h-7 w-28" />
-                ) : (
-                  <div className="mt-0.5 font-mono text-[26px] leading-none font-semibold tabular-nums">
-                    {formatRate(rateIn)}
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-muted-foreground text-xs">Upload</div>
-                {initialSummaryLoading ? (
-                  <Skeleton className="mt-1 h-7 w-28" />
-                ) : (
-                  <div className="text-muted-foreground mt-0.5 font-mono text-[26px] leading-none font-semibold tabular-nums">
-                    {formatRate(rateOut)}
-                  </div>
-                )}
-              </div>
+        <Card className="col-span-12 flex flex-col xl:col-span-8 [&>div]:flex [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-muted-foreground text-xs">Throughput</div>
+              {initialSummaryLoading ? (
+                <Skeleton className="mt-1 h-5 w-36" />
+              ) : (
+                <div className="mt-0.5 font-mono text-sm tabular-nums">
+                  {formatBytes(todayIn + todayOut)}
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    today · ↓ {formatBytes(todayIn)} · ↑ {formatBytes(todayOut)}
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="ml-auto flex flex-wrap items-end gap-4">
-              <div className="text-right">
-                <div className="text-muted-foreground text-xs">Today</div>
-                {initialSummaryLoading ? (
-                  <Skeleton className="mt-1 h-5 w-36" />
-                ) : (
-                  <div className="mt-0.5 font-mono text-sm tabular-nums">
-                    {formatBytes(todayIn + todayOut)}
-                    <span className="text-muted-foreground ml-2 text-xs">
-                      ↓ {formatBytes(todayIn)} · ↑ {formatBytes(todayOut)}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <SegmentedControl
-                value={throughputMode}
-                options={[
-                  { value: "total", label: "Total" },
-                  { value: "devices", label: "Devices" },
-                  { value: "policies", label: "Policies" },
-                ]}
-                onChange={setThroughputMode}
-              />
-            </div>
+            <SegmentedControl
+              value={throughputMode}
+              options={[
+                { value: "total", label: "Total" },
+                { value: "devices", label: "Devices" },
+                { value: "policies", label: "Policies" },
+              ]}
+              onChange={setThroughputMode}
+            />
           </div>
 
           {throughputMode === "total" ? (
@@ -373,31 +348,42 @@ export function OverviewScreen() {
               )}
               {(zoom ? zoomTimeseriesLoading : timeseriesLoading) &&
               throughputPoints.length === 0 ? (
-                <Skeleton className="h-52 w-full" />
+                <Skeleton className="min-h-52 w-full flex-1" />
               ) : throughputPoints.length === 0 ? (
-                <Empty message="No throughput history yet" />
+                <div className="flex flex-1 items-center justify-center">
+                  <Empty message="No throughput history yet" />
+                </div>
               ) : (
                 <MirroredAreaChart
+                  fill
                   points={throughputPoints}
                   onZoom={(from, to) => setZoom({ from, to })}
                 />
               )}
             </>
           ) : multiSeriesLoading && multiSeries.length === 0 ? (
-            <Skeleton className="h-52 w-full" />
+            <Skeleton className="min-h-52 w-full flex-1" />
           ) : multiSeries.length === 0 ? (
-            <Empty
-              message={
-                throughputMode === "devices"
-                  ? "No device traffic yet"
-                  : "No policy traffic yet"
-              }
-            />
+            <div className="flex flex-1 items-center justify-center">
+              <Empty
+                message={
+                  throughputMode === "devices"
+                    ? "No device traffic yet"
+                    : "No policy traffic yet"
+                }
+              />
+            </div>
           ) : (
             <>
-              <StackedAreaChart series={multiSeries} />
+              <StackedAreaChart
+                fill
+                series={multiSeries}
+                colorFor={
+                  throughputMode === "policies" ? (key) => policyColor(key) : undefined
+                }
+              />
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-                {multiSeries.map((entry) => (
+                {multiSeries.map((entry, seriesIndex) => (
                   <Link
                     key={entry.key}
                     href={
@@ -411,9 +397,12 @@ export function OverviewScreen() {
                       className="size-1.5 shrink-0 rounded-full"
                       style={{
                         background:
-                          throughputMode === "policies"
-                            ? policyColor(entry.key)
-                            : colorForKey(entry.key),
+                          entry.key === "other"
+                            ? "var(--color-chart-7)"
+                            : throughputMode === "policies"
+                              ? policyColor(entry.key)
+                              : (CHART_SLOTS[seriesIndex % CHART_SLOTS.length] ??
+                                "var(--color-chart-1)"),
                       }}
                     />
                     <span className="max-w-36 truncate">{entry.label}</span>
@@ -532,10 +521,19 @@ export function OverviewScreen() {
               <div className="font-mono text-2xl font-semibold tabular-nums">
                 {dnsTotal.toLocaleString()}
               </div>
-              <div className="text-muted-foreground text-xs">queries</div>
+              <div className="text-muted-foreground text-xs">
+                queries
+                {dns !== undefined && dns.answered + dns.unanswered > 0 && (
+                  <span>
+                    {" "}
+                    · {Math.round((dns.answered / (dns.answered + dns.unanswered)) * 100)}%
+                    answered
+                  </span>
+                )}
+              </div>
               <Sparkline className="mt-3" points={dnsSeries.map((point) => point.count)} />
               <div className="mt-3 flex flex-col gap-1.5">
-                {(dns?.topDomains ?? []).slice(0, 3).map((domain) => (
+                {(dns?.topDomains ?? []).slice(0, 5).map((domain) => (
                   <div key={domain.qname} className="flex items-center justify-between gap-3">
                     <span className="min-w-0 truncate font-mono text-[12px]">{domain.qname}</span>
                     <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">

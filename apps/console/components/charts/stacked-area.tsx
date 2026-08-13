@@ -12,7 +12,8 @@ import {
   YAxis,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { colorForKey } from "@/lib/chart-colors";
+import { CHART_SLOTS } from "@/lib/chart-colors";
+import { cn } from "@/lib/utils";
 import { formatRate, formatTime } from "@/lib/format";
 import { chartTooltipProps } from "./tooltip-style";
 import { useMounted } from "./use-mounted";
@@ -20,9 +21,13 @@ import { useMounted } from "./use-mounted";
 export function StackedAreaChart({
   series,
   height = 208,
+  fill = false,
+  colorFor,
 }: {
   series: MultiSeriesDto[];
   height?: number;
+  fill?: boolean;
+  colorFor?: (key: string, index: number) => string;
 }) {
   const mounted = useMounted();
   const activeSeries = useMemo(() => series.filter((entry) => entry.points.length > 0), [series]);
@@ -46,15 +51,19 @@ export function StackedAreaChart({
   if (data.length === 0) return null;
   if (!mounted) {
     return (
-      <div style={{ height }}>
+      <div className={cn(fill && "min-h-52 flex-1")} style={fill ? undefined : { height }}>
         <Skeleton className="h-full w-full" />
       </div>
     );
   }
 
   return (
-    <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div
+      className={cn("w-full", fill && "relative min-h-52 flex-1")}
+      style={fill ? undefined : { height }}
+    >
+      <div className={fill ? "absolute inset-0" : "h-full w-full"}>
+        <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="var(--color-border)" vertical={false} />
           <XAxis
@@ -80,7 +89,11 @@ export function StackedAreaChart({
           />
           {activeSeries.map((entry, index) => {
             const color =
-              entry.key === "other" ? "var(--color-chart-7)" : colorForKey(entry.key);
+              entry.key === "other"
+                ? "var(--color-chart-7)"
+                : (colorFor?.(entry.key, index) ??
+                  CHART_SLOTS[index % CHART_SLOTS.length] ??
+                  "var(--color-chart-1)");
             return (
               <Area
                 key={entry.key}
@@ -97,7 +110,8 @@ export function StackedAreaChart({
             );
           })}
         </AreaChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
