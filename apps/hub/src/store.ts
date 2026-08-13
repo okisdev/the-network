@@ -1395,6 +1395,10 @@ export class Store {
       clauses.push('f.process = ?');
       params.push(query.process);
     }
+    if (query.city !== undefined) {
+      clauses.push('f.city = ?');
+      params.push(query.city);
+    }
     if (query.from !== undefined) {
       clauses.push('f.ts >= ?');
       params.push(query.from);

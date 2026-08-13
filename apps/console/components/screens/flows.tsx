@@ -208,6 +208,7 @@ export function FlowsScreen() {
   const protoFilter = protoFromParam(params.get("proto"));
   const processFilter = params.get("process") ?? "";
   const portFilter = params.get("port") ?? "";
+  const cityFilter = params.get("city") ?? "";
   const search = params.get("search") ?? params.get("host") ?? "";
   const debouncedSearch = useDebounced(search, 300);
   const parsedPort = portFilter ? Number(portFilter) : undefined;
@@ -220,6 +221,7 @@ export function FlowsScreen() {
       protoFilter ||
       processFilter ||
       portFilter ||
+      cityFilter ||
       debouncedSearch.trim(),
   );
   const serverMode = paused || filterActive || isCustom;
@@ -254,6 +256,7 @@ export function FlowsScreen() {
         protoFilter || null,
         processFilter || null,
         port ?? null,
+        cityFilter || null,
         debouncedSearch.trim() || null,
         isCustom ? rangeQuery.from : null,
         isCustom ? rangeQuery.to : null,
@@ -266,6 +269,7 @@ export function FlowsScreen() {
       protoFilter,
       processFilter,
       port,
+      cityFilter,
       debouncedSearch,
       isCustom,
       rangeQuery.from,
@@ -289,6 +293,7 @@ export function FlowsScreen() {
         proto: protoFilter || undefined,
         port,
         process: processFilter || undefined,
+        city: cityFilter || undefined,
         from: isCustom ? rangeQuery.from : undefined,
         to: isCustom ? rangeQuery.to : undefined,
         limit: 100,
@@ -334,6 +339,7 @@ export function FlowsScreen() {
         proto: protoFilter || undefined,
         port,
         process: processFilter || undefined,
+        city: cityFilter || undefined,
         from: isCustom ? rangeQuery.from : undefined,
         to: isCustom ? rangeQuery.to : undefined,
         limit: 100,
@@ -359,6 +365,7 @@ export function FlowsScreen() {
     protoFilter,
     port,
     processFilter,
+    cityFilter,
     isCustom,
     rangeQuery.from,
     rangeQuery.to,
@@ -414,6 +421,7 @@ export function FlowsScreen() {
       proto: undefined,
       process: undefined,
       port: undefined,
+      city: undefined,
       search: undefined,
       host: undefined,
     });
@@ -530,6 +538,20 @@ export function FlowsScreen() {
           >
             <Badge>
               process: {processFilter}
+              <X className="size-3" />
+            </Badge>
+          </button>
+        )}
+
+        {cityFilter && (
+          <button
+            type="button"
+            aria-label={`Remove city filter ${cityFilter}`}
+            className="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none"
+            onClick={() => update({ city: undefined })}
+          >
+            <Badge>
+              city: {cityFilter}
               <X className="size-3" />
             </Badge>
           </button>

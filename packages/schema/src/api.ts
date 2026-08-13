@@ -167,6 +167,7 @@ export interface FlowsQuery {
   proto?: 'tcp' | 'udp' | 'other';
   port?: number;
   process?: string;
+  city?: string;
   from?: number;
   to?: number;
   cursor?: string;

@@ -10,7 +10,7 @@ import type {
   SankeyDto,
   TimeseriesPoint,
 } from "@the-network/schema";
-import { Download, X } from "lucide-react";
+import { ArrowLeft, Download, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -125,44 +125,59 @@ function CountriesPanel({
     refetchInterval: 15000,
   });
   const devices = Array.isArray(deviceData) ? deviceData : [];
+  const router = useRouter();
+  const selectedCountry = selected
+    ? countries.find((country) => country.code.toUpperCase() === selected)
+    : undefined;
+  const deviceRows = devices.map((device) => ({
+    key: device.deviceId,
+    label: device.deviceName,
+    value: device.bytes,
+    sub: `${device.flows.toLocaleString()} flows`,
+  }));
 
   return (
-    <Card title="Countries">
-      {selected && (
-        <div className="bg-muted ring-border mb-4 rounded-lg p-3 ring-1">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-muted-foreground text-xs">Who talks to {selected}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onClear}
-              aria-label="Clear country selection"
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-          {devicesLoading && <Skeleton className="h-20 w-full" />}
-          {devicesError && <Empty message="Destinations API not available yet" />}
-          {!devicesLoading && !devicesError && devices.length === 0 && (
-            <Empty message="No devices for this country" />
-          )}
-          {!devicesLoading && !devicesError && devices.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {devices.map((device) => (
-                <div key={device.deviceId} className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[13px]">{device.deviceName}</span>
-                  <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-                    {formatBytes(device.bytes)}
-                    <span className="ml-2">{device.flows}</span>
-                  </span>
-                </div>
-              ))}
+    <Card
+      title="Countries"
+      action={
+        selected ? <ArrowLink href={flowHref({ country: selected })}>Flows</ArrowLink> : undefined
+      }
+    >
+      {selected ? (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onClear}
+                aria-label="Back to all countries"
+              >
+                <ArrowLeft className="size-3.5" />
+              </Button>
+              <CountryChip code={selected} />
             </div>
+            {selectedCountry && (
+              <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+                {formatBytes(countryBytes(selectedCountry))} · {selectedCountry.flows} flows
+              </span>
+            )}
+          </div>
+          {devicesLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : devicesError ? (
+            <Empty message="Destinations API not available yet" />
+          ) : deviceRows.length === 0 ? (
+            <Empty message="No devices for this country" />
+          ) : (
+            <BarsList
+              rows={deviceRows}
+              onSelect={(key) => router.push(`/devices?device=${encodeURIComponent(key)}`)}
+            />
           )}
-        </div>
-      )}
-      {top.length === 0 ? (
+        </>
+      ) : top.length === 0 ? (
         <Empty
           message="No destination data yet"
           hint="Traffic starts mapping once flows carry GeoIP"
@@ -214,6 +229,9 @@ function CountriesPanel({
           })}
         </div>
       )}
+      <p className="text-muted-foreground mt-3 text-xs">
+        Proxied traffic is mapped to its declared exit region
+      </p>
     </Card>
   );
 }

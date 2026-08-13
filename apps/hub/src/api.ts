@@ -50,6 +50,7 @@ const flowsQuerySchema = z.object({
   proto: z.enum(['tcp', 'udp', 'other']).optional(),
   port: z.coerce.number().int().min(0).max(65_535).optional(),
   process: z.string().min(1).optional(),
+  city: z.string().min(1).optional(),
   from: z.coerce.number().int().optional(),
   to: z.coerce.number().int().optional(),
   cursor: z.string().optional(),

@@ -128,19 +128,20 @@ describe('Pipeline', () => {
       },
     ]);
     expect(pipeline.activeFlowCount()).toBe(0);
-    expect(pipeline.recentFlowDtos()).toEqual([
+    const recent = pipeline.recentFlowDtos();
+    expect(recent).toEqual([
       expect.objectContaining({
         id: 'flow-attrs',
         policyGroup: 'Primary',
         processPath: '/Applications/First.app/First',
         proxied: true,
         connectMs: 42,
-        country: 'US',
-        city: 'Mountain View',
         asn: 15169,
         asOrg: 'Google LLC',
       }),
     ]);
+    expect(recent[0]!.country).toBeUndefined();
+    expect(recent[0]!.city).toBeUndefined();
 
     pipeline.flush();
 
@@ -150,16 +151,16 @@ describe('Pipeline', () => {
       processPath: '/Applications/First.app/First',
       proxied: true,
       connectMs: 42,
-      country: 'US',
-      city: 'Mountain View',
       asn: 15169,
       asOrg: 'Google LLC',
     });
+    expect(store.listFlows().flows[0]!.country).toBeUndefined();
+    expect(store.listFlows().flows[0]!.city).toBeUndefined();
     expect(db.prepare('SELECT lat, lon FROM flows WHERE id = ?').get('flow-attrs')).toEqual({
-      lat: 37.386,
-      lon: -122.0838,
+      lat: null,
+      lon: null,
     });
-    expect(geoLookup).toHaveBeenCalledTimes(1);
+    expect(geoLookup).not.toHaveBeenCalled();
     expect(asnLookup).toHaveBeenCalledTimes(1);
   });
 
@@ -397,5 +398,53 @@ describe('Pipeline', () => {
     expect(listener).toHaveBeenCalledWith([
       expect.objectContaining({ server: '1.1.1.1', source: 'cache' }),
     ]);
+  });
+
+  it('maps proxied relay flows to the policy flag country and drops relay geo', () => {
+    pipeline.ingest('source-1', [
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-proxied',
+        device: { mac: '00:11:22:33:44:77', name: 'Phone' },
+        dst: { ip: '8.8.8.8', proto: 'tcp', host: 'api.example.com', port: 443 },
+        bytesIn: 10,
+        bytesOut: 5,
+        state: 'active',
+        attrs: { policy: '[Prov] \u{1F1F8}\u{1F1EC} SGP 13', proxied: true },
+      },
+      {
+        kind: 'flow_delta',
+        ts: now + 1_000,
+        flowId: 'flow-unmarked',
+        device: { mac: '00:11:22:33:44:77' },
+        dst: { ip: '8.8.8.8', proto: 'tcp', host: 'direct.example.com', port: 443 },
+        bytesIn: 7,
+        bytesOut: 3,
+        state: 'active',
+        attrs: { policy: '[Prov] \u{1F1EF}\u{1F1F5} JPN 01' },
+      },
+      {
+        kind: 'flow_delta',
+        ts: now + 2_000,
+        flowId: 'flow-proxied-flagless',
+        device: { mac: '00:11:22:33:44:77' },
+        dst: { ip: '8.8.8.8', proto: 'tcp', host: 'other.example.com', port: 443 },
+        bytesIn: 1,
+        bytesOut: 1,
+        state: 'active',
+        attrs: { policy: 'Custom Exit', proxied: true },
+      },
+    ]);
+    pipeline.flush();
+
+    const flows = store.listFlows().flows;
+    const proxied = flows.find((flow) => flow.id === 'flow-proxied')!;
+    const unmarked = flows.find((flow) => flow.id === 'flow-unmarked')!;
+    const flagless = flows.find((flow) => flow.id === 'flow-proxied-flagless')!;
+    expect(proxied.country).toBe('SG');
+    expect(proxied.city).toBeUndefined();
+    expect(unmarked.country).toBe('US');
+    expect(flagless.country).toBeUndefined();
   });
 });

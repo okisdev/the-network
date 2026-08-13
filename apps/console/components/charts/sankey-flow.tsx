@@ -123,16 +123,40 @@ export function SankeyFlow({
           }}
         >
           <Tooltip
-            {...chartTooltipProps}
-            formatter={(value, _name, item) => {
-              const link = item.payload as Partial<RenderedSankeyLink>;
-              if (!link.source || !link.target) return null;
-              return [
-                `${link.source.label} → ${link.target.label} · ${formatBytes(Number(value))}`,
-                null,
-              ];
+            wrapperStyle={chartTooltipProps.wrapperStyle}
+            isAnimationActive={false}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const item = payload[0];
+              if (item === undefined) return null;
+              const raw = item.payload as
+                | (Partial<RenderedSankeyLink> & { payload?: Partial<RenderedSankeyLink> })
+                | undefined;
+              const link = raw?.source && raw?.target ? raw : raw?.payload;
+              const bubbleStyle = { ...chartTooltipProps.contentStyle, padding: "6px 10px" };
+              if (link?.source?.label && link?.target?.label) {
+                return (
+                  <div style={bubbleStyle} className="text-xs">
+                    {link.source.label} → {link.target.label} ·{" "}
+                    <span className="font-mono tabular-nums">
+                      {formatBytes(Number(item.value ?? 0))}
+                    </span>
+                  </div>
+                );
+              }
+              const node = raw as Partial<RenderedSankeyNode> | undefined;
+              if (node?.label) {
+                return (
+                  <div style={bubbleStyle} className="text-xs">
+                    {node.label} ·{" "}
+                    <span className="font-mono tabular-nums">
+                      {formatBytes(Number(item.value ?? 0))}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
             }}
-            labelFormatter={() => ""}
           />
         </Sankey>
       </ResponsiveContainer>

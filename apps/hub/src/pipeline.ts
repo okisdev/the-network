@@ -101,6 +101,33 @@ function stickyStrings(current: string[] | undefined, next: string[] | undefined
   return current?.length ? current : next?.length ? next : undefined;
 }
 
+const REGIONAL_INDICATOR_A = 0x1f1e6;
+const REGIONAL_INDICATOR_Z = 0x1f1ff;
+
+export function flagCountry(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  for (let index = 0; index < text.length; ) {
+    const first = text.codePointAt(index);
+    if (first === undefined) return undefined;
+    const width = first > 0xffff ? 2 : 1;
+    if (first >= REGIONAL_INDICATOR_A && first <= REGIONAL_INDICATOR_Z) {
+      const second = text.codePointAt(index + width);
+      if (
+        second !== undefined &&
+        second >= REGIONAL_INDICATOR_A &&
+        second <= REGIONAL_INDICATOR_Z
+      ) {
+        return String.fromCharCode(
+          65 + first - REGIONAL_INDICATOR_A,
+          65 + second - REGIONAL_INDICATOR_A,
+        );
+      }
+    }
+    index += width;
+  }
+  return undefined;
+}
+
 function decayedRate(state: RateState | WanState, now: number): { rateIn: number; rateOut: number } {
   const idle = Math.max(0, now - state.lastUpdate);
   if (idle >= RATE_IDLE_MS) return { rateIn: 0, rateOut: 0 };
@@ -219,7 +246,12 @@ export class Pipeline {
     const deviceName = this.store.getDeviceById(deviceId)?.name ?? 'Unknown device';
     const endedAt = event.state === 'active' ? current?.endedAt : event.ts;
     const ip = event.dst.ip ?? current?.ip;
-    const geo = current?.geoResolved || ip === undefined ? undefined : this.geoLookup(ip);
+    const policy = stickyString(current?.policy, event.attrs?.policy);
+    const proxied = current?.proxied ?? event.attrs?.proxied;
+    const geo =
+      proxied === true || current?.geoResolved || ip === undefined
+        ? undefined
+        : this.geoLookup(ip);
     const asn = current?.asnResolved || ip === undefined ? undefined : this.asnLookup(ip);
     const row: RegistryRow = {
       id: event.flowId,
@@ -234,24 +266,24 @@ export class Pipeline {
       bytesIn: (current?.bytesIn ?? 0) + event.bytesIn,
       bytesOut: (current?.bytesOut ?? 0) + event.bytesOut,
       state: event.state,
-      policy: stickyString(current?.policy, event.attrs?.policy),
+      policy,
       policyChain: stickyStrings(current?.policyChain, event.attrs?.policyChain),
       policyGroup: stickyString(current?.policyGroup, event.attrs?.policyGroup),
       rule: stickyString(current?.rule, event.attrs?.rule),
       process: stickyString(current?.process, event.attrs?.process),
       processPath: stickyString(current?.processPath, event.attrs?.processPath),
-      proxied: current?.proxied ?? event.attrs?.proxied,
+      proxied,
       connectMs: current?.connectMs ?? event.attrs?.connectMs,
-      country: current?.country ?? geo?.country,
+      country: proxied === true ? flagCountry(policy) : (current?.country ?? geo?.country),
       asn: current?.asn ?? asn?.asn,
       asOrg: current?.asOrg ?? asn?.org,
       rdns: current?.rdns,
-      city: current?.city ?? geo?.city,
-      lat: current?.lat ?? geo?.lat,
-      lon: current?.lon ?? geo?.lon,
+      city: proxied === true ? undefined : (current?.city ?? geo?.city),
+      lat: proxied === true ? undefined : (current?.lat ?? geo?.lat),
+      lon: proxied === true ? undefined : (current?.lon ?? geo?.lon),
       startedAt: current?.startedAt ?? event.attrs?.startedAt,
       ...(endedAt === undefined ? {} : { endedAt }),
-      geoResolved: current?.geoResolved === true || geo !== undefined,
+      geoResolved: proxied === true || current?.geoResolved === true || geo !== undefined,
       asnResolved: current?.asnResolved === true || asn !== undefined,
       dirty: true,
       pendingBytesIn: (current?.pendingBytesIn ?? 0) + event.bytesIn,
