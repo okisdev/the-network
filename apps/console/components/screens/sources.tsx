@@ -24,7 +24,6 @@ import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusDot } from "@/components/ui/status-dot";
 import { useTimeRange } from "@/contexts/timerange-provider";
 import { ApiError, api, type RangeQuery } from "@/lib/api";
 import { formatBytes, formatTimeAgo } from "@/lib/format";
@@ -199,16 +198,16 @@ function SourceHealthStrip({
       <div>
         <p
           className={cn(
-            "font-mono text-lg tabular-nums",
+            "font-mono text-xl tabular-nums",
             uptime >= 99 ? "text-ok" : uptime >= 95 ? "text-warn" : "text-destructive",
           )}
         >
           {uptime.toFixed(uptime === 100 ? 0 : 1)}%
         </p>
-        <p className="text-[11px] text-muted-foreground">uptime · {rangeLabel}</p>
+        <p className="text-2xs text-muted-foreground">uptime · {rangeLabel}</p>
       </div>
       <div className="min-w-0">
-        <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
+        <div className="flex items-baseline justify-between gap-2 text-2xs text-muted-foreground">
           <span>latency</span>
           <span className="font-mono tabular-nums">
             {latencyMedian === undefined ? "—" : `${Math.round(latencyMedian)} ms`}
@@ -221,7 +220,7 @@ function SourceHealthStrip({
         />
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] text-muted-foreground">availability</p>
+        <p className="text-2xs text-muted-foreground">availability</p>
         {intervals.length > 0 ? (
           <PresenceRibbon className="mt-2" intervals={intervals} from={from} to={to} />
         ) : (
@@ -241,7 +240,7 @@ function SystemCard() {
   const tables = [...(data?.tables ?? [])].sort((a, b) => b.rows - a.rows).slice(0, 6);
 
   return (
-    <Card title="System" className="mt-3">
+    <Card title="System" className="mt-4">
       {isLoading && !data ? (
         <Skeleton className="h-24 w-full" />
       ) : isError || !data ? (
@@ -250,7 +249,7 @@ function SystemCard() {
         <div className="grid gap-8 sm:grid-cols-[auto_1fr_1fr]">
           <div>
             <p className="text-xs text-muted-foreground">Database</p>
-            <p className="mt-1 font-mono text-2xl tabular-nums">{formatBytes(data.sizeBytes)}</p>
+            <p className="mt-1 font-mono text-xl tabular-nums">{formatBytes(data.sizeBytes)}</p>
           </div>
           <div className="min-w-0">
             <p className="mb-2 text-xs text-muted-foreground">Tables</p>
@@ -350,7 +349,7 @@ export function SourcesScreen() {
         }
       />
 
-      {actionError && <p className="mb-3 text-sm text-destructive">{actionError}</p>}
+      {actionError && <p className="mb-4 text-sm text-destructive">{actionError}</p>}
 
       {isLoading && !sources ? (
         <Card>
@@ -364,7 +363,7 @@ export function SourcesScreen() {
           />
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {(sources ?? []).map((source) => {
             const status = statusDetails(source);
             const url = settingString(source.settings, "url");
@@ -380,7 +379,7 @@ export function SourcesScreen() {
                       <h2 className="font-medium text-foreground">{source.name}</h2>
                       <Badge tone="muted">surge</Badge>
                     </div>
-                    <div className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] text-muted-foreground">
+                    <div className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 font-mono text-2xs text-muted-foreground">
                       {url && <span className="truncate">{url}</span>}
                       {apiKey && <span>{apiKey}</span>}
                     </div>
@@ -393,7 +392,6 @@ export function SourcesScreen() {
 
                   <div className="min-w-[150px]">
                     <div className="flex items-center gap-1.5">
-                      <StatusDot tone={status.tone} />
                       <span
                         title={
                           source.status.state === "error" ? source.status.message : undefined
@@ -408,7 +406,7 @@ export function SourcesScreen() {
                       )}
                     </div>
                     {source.status.lastSuccessAt && (
-                      <p className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
+                      <p className="mt-1 font-mono text-2xs tabular-nums text-muted-foreground">
                         Last success {formatTimeAgo(source.status.lastSuccessAt)}
                       </p>
                     )}
@@ -671,13 +669,13 @@ function NumberField({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-[11px] text-muted-foreground">{label} ms</span>
+      <span className="text-2xs text-muted-foreground">{label} ms</span>
       <Input
         type="number"
         min={0}
         value={value}
         onChange={(event) => onChange(Number(event.target.value) || 0)}
-        className="w-full font-mono text-[12px] tabular-nums"
+        className="w-full font-mono text-xs tabular-nums"
       />
     </label>
   );

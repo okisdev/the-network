@@ -12,7 +12,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
 } from "react";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { SplitBar } from "@/components/charts/split-bar";
@@ -20,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CountryChip } from "@/components/ui/country-chip";
+import { DetailList, DetailRow } from "@/components/ui/detail-list";
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useLive } from "@/contexts/live-provider";
 import { useTimeRange } from "@/contexts/timerange-provider";
@@ -244,6 +245,11 @@ export function FlowsScreen() {
     refetchInterval: 120000,
   });
 
+  const { data: throughputSeed } = useQuery({
+    queryKey: ["timeseries", "wan", "seed"],
+    queryFn: () => api.timeseries({ scope: "wan", minutes: 15 }),
+  });
+
   const queryKey = useMemo(
     () =>
       [
@@ -325,6 +331,15 @@ export function FlowsScreen() {
       },
     ].slice(-60));
   }, [live.summary]);
+
+  const seededThroughput = useMemo(
+    () =>
+      Array.isArray(throughputSeed)
+        ? throughputSeed.map((point) => ({ ts: point.ts, in: point.in, out: point.out }))
+        : [],
+    [throughputSeed],
+  );
+  const shownThroughput = throughput.length > 0 ? throughput : seededThroughput;
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -431,10 +446,10 @@ export function FlowsScreen() {
   const loading = isLoading && serverMode;
 
   return (
-    <>
+    <div className="flex h-[calc(100dvh-5.5rem)] min-h-[32rem] flex-col">
       <PageHeader title="Flows" sub="Live connection log across the whole home" />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
         <Button type="button" variant="default" size="sm" onClick={() => setPaused((value) => !value)}>
           {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
           {paused ? "Resume" : "Pause"}
@@ -446,7 +461,9 @@ export function FlowsScreen() {
           onValueChange={(value) => update({ device: !value || value === ALL ? undefined : value })}
         >
           <SelectTrigger aria-label="Filter by device" className="min-w-[140px]">
-            <SelectValue />
+            <SelectValue>
+              {(devices ?? []).find((device) => device.id === deviceId)?.name ?? "All devices"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All devices</SelectItem>
@@ -463,7 +480,15 @@ export function FlowsScreen() {
           onValueChange={(value) => update({ state: !value || value === ALL ? undefined : value })}
         >
           <SelectTrigger aria-label="Filter by state" className="min-w-[120px]">
-            <SelectValue />
+            <SelectValue>
+              {stateFilter === "active"
+                ? "Active"
+                : stateFilter === "completed"
+                  ? "Completed"
+                  : stateFilter === "failed"
+                    ? "Failed"
+                    : "All states"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All states</SelectItem>
@@ -478,7 +503,7 @@ export function FlowsScreen() {
           onValueChange={(value) => update({ policy: !value || value === ALL ? undefined : value })}
         >
           <SelectTrigger aria-label="Filter by policy" className="min-w-[140px]">
-            <SelectValue />
+            <SelectValue>{policyFilter || "All policies"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All policies</SelectItem>
@@ -495,7 +520,9 @@ export function FlowsScreen() {
           onValueChange={(value) => update({ country: !value || value === ALL ? undefined : value })}
         >
           <SelectTrigger aria-label="Filter by country" className="min-w-[120px]">
-            <SelectValue />
+            <SelectValue>
+              {countryFilter ? <CountryChip code={countryFilter} /> : "All countries"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All countries</SelectItem>
@@ -644,14 +671,18 @@ export function FlowsScreen() {
       </div>
 
       {!filterActive && (
-        <Card className="mb-3">
+        <Card className="mb-4 shrink-0">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div
               role="img"
               className="min-w-0 flex-1"
               aria-label="60-second download and upload throughput"
             >
-              <MirroredAreaChart points={throughput} height={64} axes={false} />
+              {shownThroughput.length < 2 ? (
+                <Skeleton className="h-16 w-full" />
+              ) : (
+                <MirroredAreaChart points={shownThroughput} height={64} axes={false} />
+              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <StateFilterButton
@@ -684,24 +715,20 @@ export function FlowsScreen() {
         </Card>
       )}
 
-      <Card className="overflow-hidden">
+      <Card fill flush className="min-h-0 flex-1">
         {rows.length === 0 ? (
-          <Empty
-            message={loading ? "Loading flows" : "No flows yet"}
-            hint={
-              serverMode && filterActive
-                ? "Try clearing filters"
-                : "Traffic will appear once a source is connected"
-            }
-          />
+          <div className="flex flex-1 items-center justify-center">
+            <Empty
+              message={loading ? "Loading flows" : "No flows yet"}
+              hint={
+                serverMode && filterActive
+                  ? "Try clearing filters"
+                  : "Traffic will appear once a source is connected"
+              }
+            />
+          </div>
         ) : view === "stream" ? (
-          <div
-            ref={parentRef}
-            className={cn(
-              "-m-4 min-h-[280px] overflow-auto",
-              filterActive ? "h-[calc(100vh-230px)]" : "h-[calc(100vh-340px)]",
-            )}
-          >
+          <div ref={parentRef} className="h-full overflow-auto">
             <div
               className={cn(
                 COLS,
@@ -781,7 +808,7 @@ export function FlowsScreen() {
           setSelected(null);
         }}
       />
-    </>
+    </div>
   );
 }
 
@@ -803,10 +830,11 @@ function StateFilterButton({
       type="button"
       size="sm"
       variant={destructive ? "destructive" : "outline"}
-      className={cn("rounded-full font-mono tabular-nums", className)}
+      className={cn("rounded-full", className)}
       onClick={onClick}
     >
-      {label} {count}
+      <span>{label}</span>
+      <span className="font-mono tabular-nums">{count}</span>
     </Button>
   );
 }
@@ -872,9 +900,11 @@ const FlowRow = memo(function FlowRow({
         >
           {destination}
         </span>
-        {port && <span className="text-muted-foreground">{port}</span>}
+        {port && (
+          <span className="text-muted-foreground font-mono tabular-nums">{port}</span>
+        )}
         {flow.dst.proto && (
-          <span className="text-muted-foreground text-[10px]"> · {flow.dst.proto}</span>
+          <span className="text-muted-foreground font-mono text-2xs"> · {flow.dst.proto}</span>
         )}
         {flow.country && (
           <>
@@ -892,12 +922,12 @@ const FlowRow = memo(function FlowRow({
           <span className="text-muted-foreground">—</span>
         )}
         {flow.proxied && (
-          <Badge tone="muted" className="shrink-0 px-1.5 py-0 text-[10px]">
+          <Badge tone="muted" className="shrink-0 px-1.5 py-0 text-2xs">
             proxy
           </Badge>
         )}
       </span>
-      <span className="text-muted-foreground truncate" title={flow.rule}>
+      <span className="text-muted-foreground truncate font-mono text-2xs" title={flow.rule}>
         {flow.rule ?? "—"}
       </span>
       <span className="text-foreground text-right font-mono tabular-nums">
@@ -908,7 +938,7 @@ const FlowRow = memo(function FlowRow({
       </span>
       <span className="flex items-center gap-1.5">
         <StatusDot tone={stateTone(flow.state)} />
-        <span className="text-muted-foreground font-mono text-[11px]">{flow.state}</span>
+        <span className="text-muted-foreground font-mono text-2xs">{flow.state}</span>
       </span>
     </button>
   );
@@ -936,7 +966,7 @@ function GroupsView({
   const deviceMaximum = Math.max(0, ...groups.map(totalBytes));
 
   return (
-    <div className="-m-4">
+    <div className="h-full overflow-auto">
       <div className="divide-border divide-y">
         {groups.map((device) => {
           const deviceOpen = expanded.has(device.key);
@@ -985,9 +1015,9 @@ function GroupsView({
           );
         })}
       </div>
-      <footer className="border-border flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
-        <p className="text-muted-foreground text-xs">
-          Grouping {loadedFlows} loaded flows · filters and pause affect the set
+      <footer className="border-border text-muted-foreground flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-4 py-2.5 text-xs">
+        <p>
+          Grouping <span className="font-mono tabular-nums">{loadedFlows}</span> loaded flow{loadedFlows === 1 ? "" : "s"} · filters and pause affect the set
         </p>
         {canLoadMore && (
           <Button
@@ -1066,8 +1096,8 @@ function GroupLeafRow({
 function GroupMetrics({ group, maximum }: { group: DomainGroup; maximum: number }) {
   return (
     <span className="flex shrink-0 items-center gap-3">
-      <span className="text-muted-foreground whitespace-nowrap text-xs">
-        {group.flows} flows
+      <span className="text-muted-foreground whitespace-nowrap font-mono text-xs tabular-nums">
+        {group.flows} flow{group.flows === 1 ? "" : "s"}
       </span>
       <SplitBar
         inValue={group.bytesIn}
@@ -1180,7 +1210,7 @@ function FlowInspector({
           )}
           {flow.rule && (
             <DetailRow label="Rule">
-              <span className="font-mono text-[11px] break-words">{flow.rule}</span>
+              <span className="font-mono text-2xs break-words">{flow.rule}</span>
             </DetailRow>
           )}
           {flow.proxied && (
@@ -1196,7 +1226,7 @@ function FlowInspector({
           <DetailRow label="Name">{flow.process ?? "—"}</DetailRow>
           {flow.processPath && (
             <DetailRow label="Path">
-              <span className="font-mono text-[11px] break-all">{flow.processPath}</span>
+              <span className="font-mono text-2xs break-all">{flow.processPath}</span>
             </DetailRow>
           )}
         </DetailList>
@@ -1269,18 +1299,5 @@ function FlowInspector({
         </div>
       </InspectorSection>
     </InspectorPanel>
-  );
-}
-
-function DetailList({ children }: { children: ReactNode }) {
-  return <dl className="space-y-2.5">{children}</dl>;
-}
-
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3">
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="min-w-0 text-sm">{children}</dd>
-    </div>
   );
 }

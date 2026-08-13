@@ -24,14 +24,14 @@ export function Punchcard({
       {HOURS.map((hour) => (
         <span
           key={hour}
-          className="text-muted-foreground h-3 text-center font-mono text-[9px] tabular-nums"
+          className="text-muted-foreground text-2xs h-4 text-center font-mono tabular-nums"
         >
           {hour % 6 === 0 ? hour : ""}
         </span>
       ))}
       {DAYS.map((day, dayIndex) => (
         <div key={day} className="contents">
-          <span className="text-muted-foreground pr-1 text-[10px]">{day}</span>
+          <span className="text-muted-foreground text-2xs pr-1">{day}</span>
           {HOURS.map((hour) => {
             const value = Math.max(0, cells[dayIndex]?.[hour] ?? 0);
             const share = max > 0 ? Math.min(1, value / max) : 0;

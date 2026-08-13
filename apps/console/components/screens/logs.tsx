@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { RowList } from "@/components/ui/row-list";
 import {
   Select,
   SelectContent,
@@ -56,14 +57,15 @@ export function LogsScreen() {
   const dnsSearchTrimmed = debouncedDnsSearch.trim();
 
   return (
-    <>
+    <div className="flex h-[calc(100dvh-5.5rem)] min-h-[32rem] flex-col">
       <PageHeader title="Logs" sub="DNS lookups and system activity" />
 
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as "dns" | "system")}
+        className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
           <TabsList>
             <TabsTab value="dns">DNS</TabsTab>
             <TabsTab value="system">System</TabsTab>
@@ -78,7 +80,7 @@ export function LogsScreen() {
                 placeholder="Query name"
                 className="min-w-[180px]"
               />
-              <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+              <span className="font-mono text-2xs tabular-nums text-muted-foreground">
                 {dnsCount} lookup{dnsCount === 1 ? "" : "s"}
                 {dnsSearchTrimmed ? "" : " · live"}
               </span>
@@ -112,15 +114,15 @@ export function LogsScreen() {
           )}
         </div>
 
-        <TabsPanel value="dns">
+        <TabsPanel value="dns" className="mb-4 shrink-0">
           <DnsAnalytics />
         </TabsPanel>
 
-        <Card className="overflow-hidden">
-          <TabsPanel value="dns">
+        <Card fill flush className="min-h-0 flex-1">
+          <TabsPanel value="dns" className="h-full">
             <DnsTable search={dnsSearchTrimmed} onCountChange={setDnsCount} />
           </TabsPanel>
-          <TabsPanel value="system">
+          <TabsPanel value="system" className="h-full">
             <SystemTable
               level={level === "all" ? "" : level}
               search={debouncedSysSearch.trim()}
@@ -129,7 +131,7 @@ export function LogsScreen() {
           </TabsPanel>
         </Card>
       </Tabs>
-    </>
+    </div>
   );
 }
 
@@ -151,7 +153,7 @@ function DnsAnalytics() {
 
   if (isLoading && !data) {
     return (
-      <div className="mb-4 grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="col-span-12 sm:col-span-6 xl:col-span-3">
             <Skeleton className="h-28 w-full" />
@@ -162,21 +164,31 @@ function DnsAnalytics() {
   }
 
   return (
-    <div className="mb-4 grid grid-cols-12 gap-4">
-      <Card title="Queries" className="col-span-12 sm:col-span-6 xl:col-span-3">
-        <p className="font-mono text-2xl font-semibold tabular-nums">
+    <div className="grid grid-cols-12 gap-4">
+      <Card fill title="Queries" className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <div className="font-mono text-xl font-semibold tabular-nums">
           {queryTotal.toLocaleString()}
-        </p>
-        <Sparkline points={(data?.series ?? []).map((p) => p.count)} className="mt-2" />
+        </div>
+        <div className="mt-3 min-h-7 flex-1">
+          <Sparkline
+            className="h-full"
+            points={(data?.series ?? []).map((point) => point.count)}
+          />
+        </div>
       </Card>
-      <Card title="Latency" className="col-span-12 sm:col-span-6 xl:col-span-3">
-        <MiniBars
-          data={(data?.rttBuckets ?? []).map((b) => ({ label: b.label, count: b.count }))}
-          height={96}
-        />
+      <Card fill title="Latency" className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <div className="flex min-h-24 flex-1 flex-col">
+          <MiniBars
+            fill
+            data={(data?.rttBuckets ?? []).map((bucket) => ({
+              label: bucket.label,
+              count: bucket.count,
+            }))}
+          />
+        </div>
       </Card>
-      <Card title="Answered" className="col-span-12 sm:col-span-6 xl:col-span-3">
-        <div className="flex items-center gap-3">
+      <Card fill title="Answered" className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <div className="flex flex-1 items-center justify-center gap-4">
           <DonutChart
             size={120}
             slices={[
@@ -194,7 +206,6 @@ function DnsAnalytics() {
               },
             ]}
             centerLabel={answeredPct}
-            centerSub="answered"
           />
           <div className="space-y-1.5 text-xs">
             <div className="flex items-center gap-2">
@@ -216,22 +227,20 @@ function DnsAnalytics() {
           </div>
         </div>
       </Card>
-      <Card title="Resolvers" className="col-span-12 sm:col-span-6 xl:col-span-3">
+      <Card fill title="Resolvers" className="col-span-12 sm:col-span-6 xl:col-span-3">
         {resolvers.length === 0 ? (
           <Empty message="No resolver data yet" />
         ) : (
-          <ul className="space-y-1.5">
-            {resolvers.map((row) => (
-              <li key={row.server} className="flex items-center justify-between gap-2 text-xs">
-                <span className="min-w-0 truncate" title={row.server}>
-                  {row.server}
-                </span>
-                <span className="font-mono tabular-nums text-muted-foreground">
-                  {row.count.toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <RowList
+            mono
+            format={(count) => count.toLocaleString()}
+            items={resolvers.map((resolver) => ({
+              key: resolver.server,
+              label: resolver.server.replace(/^https:\/\//, ""),
+              title: resolver.server,
+              value: resolver.count,
+            }))}
+          />
         )}
       </Card>
     </div>
@@ -317,13 +326,13 @@ function DnsTable({
     return (
       <Empty
         message="No DNS lookups yet"
-        hint={isLoading ? "Loading…" : "DNS polling starts once the backend lands"}
+        hint={isLoading ? "Loading…" : "DNS lookups will appear once a source is connected"}
       />
     );
   }
 
   return (
-    <div className="-mx-4 -my-4 max-h-[calc(100vh-260px)] overflow-auto">
+    <div className="h-full overflow-auto">
       <div
         className={`${DNS_COLS} sticky top-0 z-10 border-b border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground`}
       >
@@ -340,9 +349,9 @@ function DnsTable({
         return (
           <div
             key={entry.id}
-            className={`${DNS_COLS} border-b border-border px-3 py-2 text-[12px]`}
+            className={`${DNS_COLS} border-b border-border px-3 py-2 text-xs`}
           >
-            <span className="font-mono tabular-nums text-muted-foreground">
+            <span className="font-mono text-xs tabular-nums text-muted-foreground">
               {formatTime(entry.ts)}
             </span>
             <span
@@ -351,18 +360,25 @@ function DnsTable({
             >
               {entry.qname}
             </span>
-            <span className="flex min-w-0 items-center gap-1.5">
+            <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs">
               {first != null ? (
                 <>
-                  <span className="truncate font-mono text-muted-foreground">{first}</span>
-                  {extra > 0 && <Badge tone="muted">+{extra}</Badge>}
+                  <span className="truncate text-muted-foreground">{first}</span>
+                  {extra > 0 && (
+                    <Badge tone="muted" className="px-1.5 py-0 text-2xs">
+                      +{extra}
+                    </Badge>
+                  )}
                 </>
               ) : (
                 <span className="text-muted-foreground">—</span>
               )}
             </span>
             {entry.server ? (
-              <span className="truncate font-mono text-muted-foreground" title={entry.server}>
+              <span
+                className="truncate font-mono text-xs text-muted-foreground"
+                title={entry.server}
+              >
                 {entry.server}
               </span>
             ) : (
@@ -378,7 +394,7 @@ function DnsTable({
               )}
             </span>
             <span
-              className={`text-right font-mono tabular-nums ${
+              className={`text-right font-mono text-xs tabular-nums ${
                 entry.rttMs != null ? "text-foreground" : "text-muted-foreground"
               }`}
             >
@@ -479,11 +495,20 @@ function SystemTable({
 
   const chips = (
     <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2 pt-3">
-      <button type="button" onClick={() => onLevelChange("all")}>
+      <button
+        type="button"
+        className="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none"
+        onClick={() => onLevelChange("all")}
+      >
         <Badge tone="muted">all {entries.length}</Badge>
       </button>
       {SYS_LEVELS.map((lvl) => (
-        <button key={lvl} type="button" onClick={() => onLevelChange(lvl)}>
+        <button
+          key={lvl}
+          type="button"
+          className="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none"
+          onClick={() => onLevelChange(lvl)}
+        >
           <Badge tone={levelTone(lvl)}>
             {lvl} {levelCounts[lvl]}
           </Badge>
@@ -501,7 +526,7 @@ function SystemTable({
           hint={
             isLoading
               ? "Loading…"
-              : "System activity will appear once the backend lands"
+              : "System activity will appear once the hub starts logging"
           }
         />
       </>
@@ -509,7 +534,7 @@ function SystemTable({
   }
 
   return (
-    <div className="-mx-4 -my-4 max-h-[calc(100vh-260px)] overflow-auto">
+    <div className="h-full overflow-auto">
       {chips}
       <div
         className={`${SYS_COLS} sticky top-0 z-10 border-b border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground`}
@@ -522,21 +547,21 @@ function SystemTable({
       {entries.map((entry) => (
         <div
           key={entry.id}
-          className={`${SYS_COLS} border-b border-border px-3 py-2 text-[12px]`}
+          className={`${SYS_COLS} border-b border-border px-3 py-2`}
         >
-          <span className="font-mono tabular-nums text-muted-foreground">
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
             {formatTime(entry.ts)}
           </span>
           <span>
             <Badge tone={levelTone(entry.level)}>{entry.level}</Badge>
           </span>
           <span
-            className="truncate font-mono text-[11px] text-muted-foreground"
+            className="truncate font-mono text-2xs text-muted-foreground"
             title={entry.scope}
           >
             {entry.scope}
           </span>
-          <span className="break-words text-[13px] text-muted-foreground">
+          <span className="font-sans break-words text-sm text-muted-foreground">
             {entry.message}
           </span>
         </div>

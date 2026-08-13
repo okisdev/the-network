@@ -2,11 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { EventDto } from "@the-network/schema";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import { BarsList } from "@/components/charts/bars-list";
 import { DonutChart } from "@/components/charts/donut";
 import { MiniBars } from "@/components/charts/mini-bars";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
@@ -18,6 +17,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
+import { RowList } from "@/components/ui/row-list";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot, type StatusTone } from "@/components/ui/status-dot";
@@ -25,6 +25,7 @@ import { useLive } from "@/contexts/live-provider";
 import { useTimeRange } from "@/contexts/timerange-provider";
 import { api } from "@/lib/api";
 import { CHART_SLOTS, colorForKey, policyColor } from "@/lib/chart-colors";
+import { downsampleCounts } from "@/lib/downsample";
 import { formatBytes, formatRate, formatTime, formatTimeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -47,26 +48,6 @@ function eventTone(kind: EventDto["kind"]): StatusTone {
     case "device_offline":
       return "muted";
   }
-}
-
-function downsampleRejected(series: Array<{ ts: number; flows: number }>) {
-  if (series.length === 0) return [];
-  const bucketSize = Math.max(1, Math.ceil(series.length / 24));
-  const buckets = Array.from({ length: Math.ceil(series.length / bucketSize) }, (_, index) => {
-    const points = series.slice(index * bucketSize, (index + 1) * bucketSize);
-    return {
-      ts: points[0]?.ts ?? 0,
-      count: points.reduce((total, point) => total + point.flows, 0),
-    };
-  });
-  const labelEvery = Math.max(1, Math.ceil(buckets.length / 6));
-  return buckets.map((bucket, index) => ({
-    count: bucket.count,
-    label:
-      index % labelEvery === 0 || index === buckets.length - 1
-        ? formatTime(bucket.ts).slice(0, 5)
-        : "",
-  }));
 }
 
 function KpiTile({
@@ -100,7 +81,7 @@ function KpiTile({
         </div>
       )}
       {children ?? (
-        <div className="text-muted-foreground mt-2 min-h-7 font-mono text-[11px] tabular-nums">
+        <div className="text-muted-foreground text-2xs mt-2 min-h-7 font-mono tabular-nums">
           {sub}
         </div>
       )}
@@ -241,7 +222,7 @@ export function OverviewScreen() {
   }));
   const dnsSeries = dns?.series ?? [];
   const dnsTotal = dnsSeries.reduce((total, point) => total + point.count, 0);
-  const rejectedBars = downsampleRejected(rejected?.series ?? []);
+  const rejectedBars = downsampleCounts(rejected?.series ?? []);
 
   return (
     <>
@@ -328,26 +309,10 @@ export function OverviewScreen() {
           valueClassName={cn(rejectedTodayFlows > 0 && "text-destructive")}
         />
 
-        <Card className="col-span-12 flex flex-col xl:col-span-8 [&>div]:flex [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="text-muted-foreground text-xs">Throughput</div>
-              {initialSummaryLoading ? (
-                <Skeleton className="mt-1 h-5 w-36" />
-              ) : (
-                <div className="mt-0.5 font-mono text-sm tabular-nums">
-                  {formatBytes(todayIn + todayOut)}
-                  <span className="text-muted-foreground ml-2 inline-flex items-center gap-1 text-xs">
-                    today ·
-                    <ArrowDown className="size-3 shrink-0" />
-                    {formatBytes(todayIn)}
-                    ·
-                    <ArrowUp className="size-3 shrink-0" />
-                    {formatBytes(todayOut)}
-                  </span>
-                </div>
-              )}
-            </div>
+        <Card
+          fill
+          title="Throughput"
+          action={
             <SegmentedControl
               value={throughputMode}
               options={[
@@ -357,36 +322,51 @@ export function OverviewScreen() {
               ]}
               onChange={setThroughputMode}
             />
+          }
+          className="col-span-12 xl:col-span-8"
+        >
+          <div className="mb-4 flex flex-wrap items-center gap-2 font-mono text-sm tabular-nums">
+            {initialSummaryLoading ? (
+              <Skeleton className="h-5 w-40" />
+            ) : (
+              <>
+                <span>{formatBytes(todayIn + todayOut)}</span>
+                <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                  today ·
+                  <ArrowDown className="size-3 shrink-0" />
+                  {formatBytes(todayIn)}
+                  ·
+                  <ArrowUp className="size-3 shrink-0" />
+                  {formatBytes(todayOut)}
+                </span>
+              </>
+            )}
+            {zoom && (
+              <button
+                type="button"
+                className="focus-visible:ring-ring ml-auto rounded-full focus-visible:ring-2 focus-visible:outline-none"
+                onClick={() => setZoom(null)}
+              >
+                <Badge>Zoomed · Reset</Badge>
+              </button>
+            )}
           </div>
 
           {throughputMode === "total" ? (
-            <>
-              {zoom && (
-                <div className="mb-2 flex justify-end">
-                  <button
-                    type="button"
-                    className="rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    onClick={() => setZoom(null)}
-                  >
-                    <Badge>Zoomed · Reset</Badge>
-                  </button>
-                </div>
-              )}
-              {(zoom ? zoomTimeseriesLoading : timeseriesLoading) &&
-              throughputPoints.length === 0 ? (
-                <Skeleton className="min-h-52 w-full flex-1" />
-              ) : throughputPoints.length === 0 ? (
-                <div className="flex flex-1 items-center justify-center">
-                  <Empty message="No throughput history yet" />
-                </div>
-              ) : (
-                <MirroredAreaChart
-                  fill
-                  points={throughputPoints}
-                  onZoom={(from, to) => setZoom({ from, to })}
-                />
-              )}
-            </>
+            (zoom ? zoomTimeseriesLoading : timeseriesLoading) &&
+            throughputPoints.length === 0 ? (
+              <Skeleton className="min-h-52 w-full flex-1" />
+            ) : throughputPoints.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Empty message="No throughput history yet" />
+              </div>
+            ) : (
+              <MirroredAreaChart
+                fill
+                points={throughputPoints}
+                onZoom={(from, to) => setZoom({ from, to })}
+              />
+            )
           ) : multiSeriesLoading && multiSeries.length === 0 ? (
             <Skeleton className="min-h-52 w-full flex-1" />
           ) : multiSeries.length === 0 ? (
@@ -459,52 +439,36 @@ export function OverviewScreen() {
                     centerSub="today"
                   />
                 </div>
-                <div className="mt-3 flex flex-col gap-1.5">
-                  {policySplit.map((entry) => (
-                    <Link
-                      key={entry.policy}
-                      href={`/flows?policy=${encodeURIComponent(entry.policy)}`}
-                      className="hover:bg-muted -mx-1.5 flex items-center gap-2 rounded-sm px-1.5 py-0.5"
-                    >
-                      <span
-                        className="size-1.5 shrink-0 rounded-full"
-                        style={{ background: policyColor(entry.policy) }}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-[13px]">{entry.policy}</span>
-                      <span className="text-muted-foreground shrink-0 text-right font-mono text-[11px] tabular-nums">
-                        {formatBytes(entry.bytes)} ·{" "}
-                        {((entry.bytes / Math.max(1, totalPolicyBytes)) * 100).toFixed(1)}%
-                      </span>
-                    </Link>
-                  ))}
-                </div>
+                <RowList
+                  className="mt-3"
+                  items={policySplit.map((entry) => ({
+                    key: entry.policy,
+                    label: entry.policy,
+                    value: entry.bytes,
+                    valueSub: `${((entry.bytes / Math.max(1, totalPolicyBytes)) * 100).toFixed(1)}%`,
+                    color: policyColor(entry.policy),
+                    href: `/flows?policy=${encodeURIComponent(entry.policy)}`,
+                  }))}
+                />
               </>
             )}
           </Card>
 
-          <Card title="Devices">
+          <Card
+            title="Top devices"
+            action={<ArrowLink href="/devices">All devices</ArrowLink>}
+          >
             {overviewLoading && !overview ? (
               <Skeleton className="h-40 w-full" />
+            ) : topDevices.length === 0 ? (
+              <Empty message="No devices yet" />
             ) : (
-              <>
-                <div className="mb-3 flex items-baseline gap-2">
-                  <span className="font-mono text-2xl font-semibold tabular-nums">
-                    {activeDevices.toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                    active of {totalDevices.toLocaleString()}
-                  </span>
-                </div>
-                {topDevices.length === 0 ? (
-                  <Empty message="No devices yet" />
-                ) : (
-                  <BarsList
-                    rows={topDevices}
-                    format={formatRate}
-                    onSelect={(key) => router.push(`/devices?device=${encodeURIComponent(key)}`)}
-                  />
-                )}
-              </>
+              <RowList
+                bars
+                items={topDevices}
+                format={formatRate}
+                onSelect={(key) => router.push(`/devices?device=${encodeURIComponent(key)}`)}
+              />
             )}
           </Card>
         </div>
@@ -515,8 +479,10 @@ export function OverviewScreen() {
           ) : destinationRows.length === 0 ? (
             <Empty message="No destinations yet" />
           ) : (
-            <BarsList
-              rows={destinationRows}
+            <RowList
+              bars
+              mono
+              items={destinationRows}
               onSelect={(key) =>
                 router.push(`/destinations?tab=domains&host=${encodeURIComponent(key)}`)
               }
@@ -530,14 +496,17 @@ export function OverviewScreen() {
           ) : processRows.length === 0 ? (
             <Empty message="No processes yet" />
           ) : (
-            <BarsList
-              rows={processRows}
+            <RowList
+              bars
+              mono
+              items={processRows}
               onSelect={(key) => router.push(`/flows?process=${encodeURIComponent(key)}`)}
             />
           )}
         </Card>
 
         <Card
+          fill
           title="DNS"
           action={<ArrowLink href="/logs">All lookups</ArrowLink>}
           className="col-span-12 xl:col-span-4"
@@ -545,10 +514,12 @@ export function OverviewScreen() {
           {dnsLoading && !dns ? (
             <Skeleton className="h-52 w-full" />
           ) : dnsSeries.length === 0 && (dns?.topDomains.length ?? 0) === 0 ? (
-            <Empty message="No DNS lookups yet" />
+            <div className="flex flex-1 items-center justify-center">
+              <Empty message="No DNS lookups yet" />
+            </div>
           ) : (
             <>
-              <div className="font-mono text-2xl font-semibold tabular-nums">
+              <div className="font-mono text-xl font-semibold tabular-nums">
                 {dnsTotal.toLocaleString()}
               </div>
               <div className="text-muted-foreground text-xs">
@@ -561,36 +532,40 @@ export function OverviewScreen() {
                   </span>
                 )}
               </div>
-              <Sparkline className="mt-3" points={dnsSeries.map((point) => point.count)} />
-              <div className="mt-3 flex flex-col gap-1.5">
-                {(dns?.topDomains ?? []).slice(0, 5).map((domain) => (
-                  <div key={domain.qname} className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate font-mono text-[12px]">{domain.qname}</span>
-                    <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-                      {domain.count.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+              <div className="mt-3 min-h-7 flex-1">
+                <Sparkline className="h-full" points={dnsSeries.map((point) => point.count)} />
               </div>
+              <RowList
+                className="mt-3"
+                mono
+                format={(n) => n.toLocaleString()}
+                items={(dns?.topDomains ?? []).slice(0, 5).map((domain) => ({
+                  key: domain.qname,
+                  label: domain.qname,
+                  value: domain.count,
+                }))}
+              />
             </>
           )}
         </Card>
 
-        <Card title="Recent events" className="col-span-12 xl:col-span-6">
+        <Card fill title="Recent events" className="col-span-12 xl:col-span-6">
           {overviewLoading && !overview && recentEvents.length === 0 ? (
             <Skeleton className="h-40 w-full" />
           ) : recentEvents.length === 0 ? (
-            <Empty message="Nothing has happened yet" />
+            <div className="flex flex-1 items-center justify-center">
+              <Empty message="Nothing has happened yet" />
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
               {recentEvents.map((event) => (
                 <div key={event.id} className="flex items-center gap-3">
-                  <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+                  <span className="text-muted-foreground text-2xs font-mono tabular-nums">
                     {formatTime(event.ts)}
                   </span>
                   <StatusDot tone={eventTone(event.kind)} />
-                  <span className="min-w-0 flex-1 truncate text-[13px]">{event.message}</span>
-                  <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
+                  <span className="min-w-0 flex-1 truncate text-sm">{event.message}</span>
+                  <span className="text-muted-foreground text-2xs font-mono tabular-nums">
                     {formatTimeAgo(event.ts)}
                   </span>
                 </div>
@@ -600,6 +575,7 @@ export function OverviewScreen() {
         </Card>
 
         <Card
+          fill
           title="Rejected & failed"
           action={<ArrowLink href="/insights">Insights</ArrowLink>}
           className="col-span-12 xl:col-span-6"
@@ -607,29 +583,28 @@ export function OverviewScreen() {
           {rejectedLoading && !rejected ? (
             <Skeleton className="h-40 w-full" />
           ) : rejectedBars.length === 0 && (rejected?.topHosts.length ?? 0) === 0 ? (
-            <Empty message="No rejected or failed flows" />
+            <div className="flex flex-1 items-center justify-center">
+              <Empty message="No rejected or failed flows" />
+            </div>
           ) : (
-            <>
-              <div className="grid gap-5 sm:grid-cols-[1.4fr_1fr]">
-                {rejectedBars.length === 0 ? (
-                  <Empty message="No timeline data" />
-                ) : (
-                  <MiniBars data={rejectedBars} color="var(--color-chart-6)" height={120} />
-                )}
-                <div className="flex flex-col gap-2">
-                  {(rejected?.topHosts ?? []).slice(0, 3).map((host) => (
-                    <div key={host.key} className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 truncate font-mono text-[12px]">
-                        {host.label ?? host.key}
-                      </span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-                        {host.flows.toLocaleString()} flows
-                      </span>
-                    </div>
-                  ))}
+            <div className="grid min-h-0 flex-1 gap-6 sm:grid-cols-[1.4fr_1fr]">
+              {rejectedBars.length === 0 ? (
+                <Empty message="No timeline data" />
+              ) : (
+                <div className="flex min-h-24 min-w-0 flex-col">
+                  <MiniBars fill data={rejectedBars} color="var(--color-chart-6)" />
                 </div>
-              </div>
-            </>
+              )}
+              <RowList
+                mono
+                format={(n) => `${n.toLocaleString()} flows`}
+                items={(rejected?.topHosts ?? []).slice(0, 5).map((host) => ({
+                  key: host.key,
+                  label: host.label ?? host.key,
+                  value: host.flows,
+                }))}
+              />
+            </div>
           )}
         </Card>
       </div>

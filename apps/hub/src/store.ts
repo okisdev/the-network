@@ -1521,7 +1521,7 @@ export class Store {
          WHERE bucket >= ? AND bucket <= ? AND scope = ?
            AND substr(key, 1, length(?) + 1) = ? || '|'
          GROUP BY key
-         ORDER BY bytes_in + bytes_out DESC, key
+         ORDER BY SUM(bytes_in) + SUM(bytes_out) DESC, key
          LIMIT ?`,
       )
       .all(deviceId, start, end, scope, deviceId, deviceId, limit) as BreakdownSqlRow[];
@@ -1892,7 +1892,7 @@ export class Store {
          FROM flows f ${deviceJoin}
          WHERE ${clauses.join(' AND ')}
          GROUP BY ${column}${deviceGroup}
-         ORDER BY bytes_in + bytes_out DESC, key
+         ORDER BY SUM(f.bytes_in) + SUM(f.bytes_out) DESC, key
          LIMIT ?`,
       )
       .all(...params, limit) as BreakdownSqlRow[];
@@ -2267,7 +2267,7 @@ export class Store {
            FROM flows f ${join}
            WHERE f.ts >= ? AND f.ts <= ? AND ${rejectedWhere} AND ${column} IS NOT NULL
            GROUP BY ${column}${joinDevices ? ', d.name' : ''}
-           ORDER BY flows DESC, bytes_in + bytes_out DESC, key LIMIT 8`,
+           ORDER BY flows DESC, SUM(f.bytes_in) + SUM(f.bytes_out) DESC, key LIMIT 8`,
         )
         .all(window.from, window.to) as Array<BreakdownSqlRow & { label?: string | null }>;
       return rows.map((row) => ({

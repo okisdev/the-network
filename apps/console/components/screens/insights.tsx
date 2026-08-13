@@ -6,7 +6,6 @@ import type { BreakdownRow, MoverRow } from "@the-network/schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BarsList } from "@/components/charts/bars-list";
 import { DailyBars } from "@/components/charts/daily-bars";
 import { MiniBars } from "@/components/charts/mini-bars";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
@@ -17,31 +16,13 @@ import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { PageHeader } from "@/components/ui/page-header";
+import { RowList } from "@/components/ui/row-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTimeRange } from "@/contexts/timerange-provider";
 import { api, type RangeQuery } from "@/lib/api";
 import { policyColor } from "@/lib/chart-colors";
-import { formatBytes, formatTime, formatTimeAgo } from "@/lib/format";
-
-function downsampleRejected(series: Array<{ ts: number; flows: number }>) {
-  if (series.length === 0) return [];
-  const bucketSize = Math.max(1, Math.ceil(series.length / 24));
-  const buckets = Array.from({ length: Math.ceil(series.length / bucketSize) }, (_, index) => {
-    const points = series.slice(index * bucketSize, (index + 1) * bucketSize);
-    return {
-      ts: points[0]?.ts ?? 0,
-      count: points.reduce((total, point) => total + point.flows, 0),
-    };
-  });
-  const labelEvery = Math.max(1, Math.ceil(buckets.length / 6));
-  return buckets.map((bucket, index) => ({
-    count: bucket.count,
-    label:
-      index % labelEvery === 0 || index === buckets.length - 1
-        ? formatTime(bucket.ts).slice(0, 5)
-        : "",
-  }));
-}
+import { downsampleCounts } from "@/lib/downsample";
+import { formatBytes, formatTimeAgo } from "@/lib/format";
 
 function rejectedRows(rows: BreakdownRow[]) {
   return rows.map((row) => ({
@@ -65,14 +46,14 @@ function MoverCard({
 }) {
   const activeRows = rows.filter((row) => row.current > 0 || row.previous > 0);
   return (
-    <Card title={title} className="col-span-12 lg:col-span-6">
+    <Card title={title} className="col-span-12 lg:col-span-6 xl:self-start">
       {loading ? (
         <Skeleton className="h-64 w-full" />
       ) : activeRows.length === 0 ? (
         <Empty message="Both windows are quiet" />
       ) : (
-        <div className="flex flex-col gap-1">
-          {activeRows.slice(0, 8).map((row) => {
+        <RowList
+          items={activeRows.slice(0, 8).map((row) => {
             const rising = row.current >= row.previous;
             const ratio = row.previous === 0 ? Infinity : row.current / row.previous;
             const change =
@@ -81,34 +62,28 @@ function MoverCard({
                 : ratio >= 10
                   ? `×${Math.round(ratio)} vs previous`
                   : `${Math.round(Math.abs(((row.current - row.previous) / row.previous) * 100))}% vs previous`;
-            return (
-              <Link
-                key={row.key}
-                href={
-                  kind === "device"
-                    ? `/devices?device=${encodeURIComponent(row.key)}`
-                    : `/destinations?tab=domains&host=${encodeURIComponent(row.key)}`
-                }
-                className="hover:bg-muted -mx-1.5 flex items-center justify-between gap-4 rounded-sm px-1.5 py-1.5"
-              >
-                <span className="min-w-0 truncate text-[13px]">{row.label}</span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-mono text-xs tabular-nums">
-                    {formatBytes(row.current)}
-                  </span>
-                  <span className="text-muted-foreground flex items-center justify-end gap-1 font-mono text-xs tabular-nums">
-                    {rising ? (
-                      <ArrowUp className="size-3 shrink-0" />
-                    ) : (
-                      <ArrowDown className="size-3 shrink-0" />
-                    )}
-                    {change}
-                  </span>
+            return {
+              key: row.key,
+              label: row.label,
+              value: row.current,
+              valueSub: (
+                <span className="flex items-center justify-end gap-1">
+                  {rising ? (
+                    <ArrowUp className="size-3 shrink-0" />
+                  ) : (
+                    <ArrowDown className="size-3 shrink-0" />
+                  )}
+                  {change}
                 </span>
-              </Link>
-            );
+              ),
+              href:
+                kind === "device"
+                  ? `/devices?device=${encodeURIComponent(row.key)}`
+                  : `/destinations?tab=domains&host=${encodeURIComponent(row.key)}`,
+            };
           })}
-        </div>
+          mono={kind === "domain"}
+        />
       )}
     </Card>
   );
@@ -198,8 +173,10 @@ function PolicyInspector({
         ) : destinationRows.length === 0 ? (
           <Empty message="No destinations yet" />
         ) : (
-          <BarsList
-            rows={destinationRows.map((row) => ({
+          <RowList
+            bars
+            mono
+            items={destinationRows.map((row) => ({
               key: row.key,
               label: row.key,
               value: row.bytesIn + row.bytesOut,
@@ -217,8 +194,9 @@ function PolicyInspector({
         ) : processRows.length === 0 ? (
           <Empty message="No processes yet" />
         ) : (
-          <BarsList
-            rows={processRows.map((row) => ({
+          <RowList
+            bars
+            items={processRows.map((row) => ({
               key: row.key,
               label: row.label ?? row.key,
               value: row.bytesIn + row.bytesOut,
@@ -288,7 +266,7 @@ export function InsightsScreen() {
     refetchInterval: 20000,
   });
 
-  const rejectedBars = downsampleRejected(rejected?.series ?? []);
+  const rejectedBars = downsampleCounts(rejected?.series ?? []);
   const hostRows = rejectedRows(rejected?.topHosts ?? []);
   const deviceRows = rejectedRows(rejected?.topDevices ?? []);
   const ruleRows = rejectedRows(rejected?.topRules ?? []);
@@ -303,7 +281,7 @@ export function InsightsScreen() {
     <>
       <PageHeader title="Insights" sub="Patterns, movers and anomalies" />
       <div className="grid grid-cols-12 gap-4">
-        <Card title="Rhythm" className="col-span-12 xl:col-span-7">
+        <Card title="Rhythm" className="col-span-12 xl:col-span-7 xl:self-start">
           {punchcardLoading && !punchcard ? (
             <Skeleton className="h-52 w-full" />
           ) : !punchcard || punchcard.cells.length === 0 ? (
@@ -318,13 +296,15 @@ export function InsightsScreen() {
           )}
         </Card>
 
-        <Card title="Daily volume" className="col-span-12 xl:col-span-5">
+        <Card fill title="Daily volume" className="col-span-12 xl:col-span-5">
           {dailyLoading && !daily ? (
-            <Skeleton className="h-52 w-full" />
+            <Skeleton className="min-h-52 w-full flex-1" />
           ) : (daily ?? []).length === 0 ? (
-            <Empty message="No daily volume yet" />
+            <div className="flex min-h-52 flex-1 items-center justify-center">
+              <Empty message="No daily volume yet" />
+            </div>
           ) : (
-            <DailyBars points={daily ?? []} />
+            <DailyBars fill points={daily ?? []} />
           )}
         </Card>
 
@@ -349,68 +329,74 @@ export function InsightsScreen() {
           ) : (
             <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
               <div>
-                <h3 className="text-muted-foreground mb-3 text-xs font-medium">Timeline</h3>
-                {rejectedBars.length === 0 ? (
-                  <Empty message="No timeline data" />
-                ) : (
-                  <MiniBars
-                    data={rejectedBars}
-                    color="var(--color-chart-6)"
-                    height={144}
-                  />
-                )}
+                <h3 className="text-muted-foreground mb-2.5 text-xs font-medium">Timeline</h3>
+                <div className="flex min-h-24 min-w-0 flex-col">
+                  {rejectedBars.length === 0 ? (
+                    <Empty message="No timeline data" />
+                  ) : (
+                    <MiniBars fill data={rejectedBars} color="var(--color-chart-6)" />
+                  )}
+                </div>
               </div>
               <div>
-                <h3 className="text-muted-foreground mb-3 text-xs font-medium">Hosts</h3>
+                <h3 className="text-muted-foreground mb-2.5 text-xs font-medium">Hosts</h3>
                 {hostRows.length === 0 ? (
                   <Empty message="No hosts" />
                 ) : (
-                  <BarsList
-                    rows={hostRows}
+                  <RowList
+                    bars
+                    mono
+                    items={hostRows}
                     format={(value) => value.toLocaleString()}
                     onSelect={(key) => router.push(`/flows?search=${encodeURIComponent(key)}`)}
                   />
                 )}
               </div>
               <div>
-                <h3 className="text-muted-foreground mb-3 text-xs font-medium">Devices</h3>
+                <h3 className="text-muted-foreground mb-2.5 text-xs font-medium">Devices</h3>
                 {deviceRows.length === 0 ? (
                   <Empty message="No devices" />
                 ) : (
-                  <BarsList
-                    rows={deviceRows}
+                  <RowList
+                    bars
+                    items={deviceRows}
                     format={(value) => value.toLocaleString()}
                     onSelect={(key) => router.push(`/flows?device=${encodeURIComponent(key)}`)}
                   />
                 )}
               </div>
               <div>
-                <h3 className="text-muted-foreground mb-3 text-xs font-medium">Rules</h3>
+                <h3 className="text-muted-foreground mb-2.5 text-xs font-medium">Rules</h3>
                 {ruleRows.length === 0 ? (
                   <Empty message="No rules" />
                 ) : (
-                  <BarsList rows={ruleRows} format={(value) => value.toLocaleString()} />
+                  <RowList
+                    bars
+                    mono
+                    items={ruleRows}
+                    format={(value) => value.toLocaleString()}
+                  />
                 )}
               </div>
             </div>
           )}
         </Card>
 
-        <Card title="New devices" className="col-span-12 lg:col-span-6">
+        <Card title="New devices" className="col-span-12 lg:col-span-6 xl:self-start">
           {firstSeenLoading && !firstSeen ? (
             <Skeleton className="h-48 w-full" />
           ) : (firstSeen?.devices.length ?? 0) === 0 ? (
             <Empty message="No new devices this week" />
           ) : (
-            <div className="flex flex-col gap-1">
-              {(firstSeen?.devices ?? []).map((device) => (
+            <div className="flex flex-col">
+              {(firstSeen?.devices ?? []).slice(0, 12).map((device) => (
                 <Link
                   key={device.deviceId}
                   href={`/devices?device=${encodeURIComponent(device.deviceId)}`}
-                  className="hover:bg-muted -mx-1.5 flex items-center justify-between gap-4 rounded-sm px-1.5 py-1.5"
+                  className="hover:bg-muted -mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5"
                 >
-                  <span className="min-w-0 truncate text-[13px]">{device.name}</span>
-                  <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+                  <span className="min-w-0 truncate text-sm">{device.name}</span>
+                  <span className="text-muted-foreground shrink-0 font-mono text-2xs tabular-nums">
                     {formatTimeAgo(device.firstSeenAt)}
                   </span>
                 </Link>
@@ -419,29 +405,23 @@ export function InsightsScreen() {
           )}
         </Card>
 
-        <Card title="New domains" className="col-span-12 lg:col-span-6">
+        <Card title="New domains" className="col-span-12 lg:col-span-6 xl:self-start">
           {firstSeenLoading && !firstSeen ? (
             <Skeleton className="h-48 w-full" />
           ) : (firstSeen?.domains.length ?? 0) === 0 ? (
             <Empty message="No new domains this week" />
           ) : (
-            <div className="flex flex-col gap-1">
-              {(firstSeen?.domains ?? []).map((domain) => (
-                <Link
-                  key={domain.domain}
-                  href={`/destinations?tab=domains&host=${encodeURIComponent(domain.domain)}`}
-                  className="hover:bg-muted -mx-1.5 flex items-center justify-between gap-4 rounded-sm px-1.5 py-1.5"
-                >
-                  <span className="min-w-0 truncate font-mono text-[12px]">{domain.domain}</span>
-                  <span className="text-muted-foreground shrink-0 text-right font-mono text-[10px] leading-4 tabular-nums">
-                    <span className="block">{formatTimeAgo(domain.firstTs)}</span>
-                    <span className="block">
-                      {formatBytes(domain.bytes)} · {domain.devices.toLocaleString()} devices
-                    </span>
-                  </span>
-                </Link>
-              ))}
-            </div>
+            <RowList
+              mono
+              items={(firstSeen?.domains ?? []).slice(0, 12).map((domain) => ({
+                key: domain.domain,
+                label: domain.domain,
+                sub: `${domain.devices.toLocaleString()} devices`,
+                value: domain.bytes,
+                valueSub: formatTimeAgo(domain.firstTs),
+                href: `/destinations?tab=domains&host=${encodeURIComponent(domain.domain)}`,
+              }))}
+            />
           )}
         </Card>
 
@@ -471,7 +451,7 @@ export function InsightsScreen() {
                         />
                         <span className="truncate">{entry.label}</span>
                       </span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+                      <span className="text-muted-foreground shrink-0 font-mono text-2xs tabular-nums">
                         {formatBytes(total)}
                       </span>
                     </div>

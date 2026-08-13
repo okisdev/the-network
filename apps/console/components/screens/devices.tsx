@@ -6,7 +6,6 @@ import type { DeviceDto } from "@the-network/schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
-import { BarsList } from "@/components/charts/bars-list";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { PresenceRibbon } from "@/components/charts/presence-ribbon";
 import { SplitBar } from "@/components/charts/split-bar";
@@ -16,10 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CountryChip } from "@/components/ui/country-chip";
+import { DetailList, DetailRow } from "@/components/ui/detail-list";
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { PageHeader } from "@/components/ui/page-header";
+import { RowList } from "@/components/ui/row-list";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
@@ -141,6 +142,23 @@ export function DevicesScreen() {
     () => Math.max(0, ...filtered.map((device) => device.todayIn + device.todayOut)),
     [filtered],
   );
+  const stats = isLoading && !data ? (
+    <Skeleton className="h-5 w-80 max-w-full" />
+  ) : (
+    <>
+      <span>{summary.total} devices</span>
+      <span aria-hidden>·</span>
+      <span>{summary.online} online</span>
+      <span aria-hidden>·</span>
+      <span>{summary.managed} managed by Surge</span>
+      {summary.newCount > 0 && (
+        <>
+          <span aria-hidden>·</span>
+          <span>{summary.newCount} new this week</span>
+        </>
+      )}
+    </>
+  );
 
   const openInspector = useCallback(
     (deviceId: string) => updateParams({ device: deviceId }),
@@ -155,27 +173,9 @@ export function DevicesScreen() {
 
   return (
     <>
-      <PageHeader title="Devices" sub="Every device on the network, live" />
+      <PageHeader title="Devices" sub="Every device on the network, live" stats={stats} />
 
-      {isLoading && !data ? (
-        <Skeleton className="-mt-2 mb-5 h-5 w-80 max-w-full" />
-      ) : (
-        <div className="text-muted-foreground -mt-2 mb-5 flex flex-wrap items-center gap-2 font-mono text-sm tabular-nums">
-          <span>{summary.total} devices</span>
-          <span aria-hidden>·</span>
-          <span>{summary.online} online</span>
-          <span aria-hidden>·</span>
-          <span>{summary.managed} managed by Surge</span>
-          {summary.newCount > 0 && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{summary.newCount} new this week</span>
-            </>
-          )}
-        </div>
-      )}
-
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <SegmentedControl
           value={view}
           options={[
@@ -268,8 +268,20 @@ function DevicesList({
   onSelect: (deviceId: string) => void;
   onSort: (key: SortKey) => void;
 }) {
+  const [showIdle, setShowIdle] = useState(false);
+  const active = devices.filter(
+    (device) =>
+      device.online || device.combinedRate > 0 || device.todayIn + device.todayOut > 0,
+  );
+  const idle = devices.filter(
+    (device) =>
+      !device.online && device.combinedRate === 0 && device.todayIn + device.todayOut === 0,
+  );
+  const queryActive = search.trim().length > 0;
+  const visibleIdle = queryActive || showIdle;
+
   return (
-    <Card className="overflow-hidden">
+    <Card flush>
       {isLoading ? (
         <DevicesListSkeleton />
       ) : devices.length === 0 ? (
@@ -282,118 +294,159 @@ function DevicesList({
           }
         />
       ) : (
-        <div className="-m-4">
-          <Table className="min-w-[880px]">
-            <TableHead>
-              <TableRow className="hover:bg-transparent">
-                <TableHeader className="px-4">Status</TableHeader>
-                <TableHeader
-                  className="hover:text-foreground cursor-pointer"
-                  aria-sort={ariaSort("name")}
-                  onClick={() => onSort("name")}
-                >
-                  Device
-                </TableHeader>
-                <TableHeader>IPs</TableHeader>
-                <TableHeader
-                  className="hover:text-foreground cursor-pointer text-right"
-                  aria-sort={ariaSort("rate")}
-                  onClick={() => onSort("rate")}
-                >
-                  Down
-                </TableHeader>
-                <TableHeader
-                  className="hover:text-foreground cursor-pointer text-right"
-                  aria-sort={ariaSort("rate")}
-                  onClick={() => onSort("rate")}
-                >
-                  Up
-                </TableHeader>
-                <TableHeader
-                  className="hover:text-foreground cursor-pointer text-right"
-                  aria-sort={ariaSort("today")}
-                  onClick={() => onSort("today")}
-                >
-                  Today
-                </TableHeader>
-                <TableHeader
-                  className="hover:text-foreground cursor-pointer px-4"
-                  aria-sort={ariaSort("lastSeen")}
-                  onClick={() => onSort("lastSeen")}
-                >
-                  Last seen
-                </TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {devices.map((device) => {
-                const firstIp = device.ips[0];
-                const extra = Math.max(0, device.ips.length - 1);
-                const DeviceIcon = deviceIcon(device.iconId, device.name);
-                return (
-                  <TableRow
-                    key={device.id}
-                    className={cn(
-                      "hover:bg-muted cursor-pointer",
-                      selectedId === device.id && "bg-muted",
-                    )}
-                    onClick={() => onSelect(device.id)}
+        <Table
+          className="min-w-[880px]"
+          containerClassName="max-h-[calc(100dvh-20rem)] overflow-y-auto"
+        >
+          <TableHead className="bg-card sticky top-0 z-10">
+            <TableRow className="hover:bg-transparent">
+              <TableHeader className="px-4">Status</TableHeader>
+              <TableHeader
+                className="hover:text-foreground cursor-pointer"
+                aria-sort={ariaSort("name")}
+                onClick={() => onSort("name")}
+              >
+                Device
+              </TableHeader>
+              <TableHeader>IPs</TableHeader>
+              <TableHeader
+                className="hover:text-foreground cursor-pointer text-right"
+                aria-sort={ariaSort("rate")}
+                onClick={() => onSort("rate")}
+              >
+                Down
+              </TableHeader>
+              <TableHeader
+                className="hover:text-foreground cursor-pointer text-right"
+                aria-sort={ariaSort("rate")}
+                onClick={() => onSort("rate")}
+              >
+                Up
+              </TableHeader>
+              <TableHeader
+                className="hover:text-foreground cursor-pointer text-right"
+                aria-sort={ariaSort("today")}
+                onClick={() => onSort("today")}
+              >
+                Today
+              </TableHeader>
+              <TableHeader
+                className="hover:text-foreground cursor-pointer px-4"
+                aria-sort={ariaSort("lastSeen")}
+                onClick={() => onSort("lastSeen")}
+              >
+                Last seen
+              </TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {active.map((device) => (
+              <DeviceTableRow
+                key={device.id}
+                device={device}
+                selectedId={selectedId}
+                todayMaximum={todayMaximum}
+                onSelect={onSelect}
+              />
+            ))}
+            {!queryActive && idle.length > 0 && (
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableCell colSpan={7} className="p-0">
+                  <button
+                    type="button"
+                    className="border-border text-muted-foreground hover:bg-muted w-full border-t px-4 py-2.5 text-left text-xs"
+                    onClick={() => setShowIdle((visible) => !visible)}
                   >
-                    <TableCell className="px-4">
-                      <StatusDot tone={device.online ? "ok" : "muted"} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <span className="bg-muted ring-border inline-flex size-7 shrink-0 items-center justify-center rounded-md ring-1">
-                          <DeviceIcon className="text-muted-foreground size-3.5" />
-                        </span>
-                        <div className="min-w-0">
-                          <div className="text-foreground truncate font-medium">{device.name}</div>
-                          {!isHiddenMac(device.mac) && (
-                            <div className="text-muted-foreground font-mono text-[11px] tabular-nums">
-                              {device.mac}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs tabular-nums">
-                      {firstIp ?? "None"}
-                      {extra > 0 && <span> +{extra}</span>}
-                    </TableCell>
-                    <TableCell className="text-foreground text-right font-mono text-xs tabular-nums">
-                      {formatRate(device.rateIn)}
-                    </TableCell>
-                    <TableCell className="text-foreground text-right font-mono text-xs tabular-nums">
-                      {formatRate(device.rateOut)}
-                    </TableCell>
-                    <TableCell
-                      className="text-muted-foreground font-mono text-xs tabular-nums"
-                      title={`↓ ${formatBytes(device.todayIn)} · ↑ ${formatBytes(device.todayOut)}`}
-                    >
-                      <div className="flex items-center justify-end gap-3">
-                        <SplitBar
-                          className="w-20 shrink-0"
-                          inValue={device.todayIn}
-                          outValue={device.todayOut}
-                          max={todayMaximum}
-                        />
-                        <span className="w-16 shrink-0 text-right">
-                          {formatBytes(device.todayIn + device.todayOut)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground px-4 font-mono text-xs tabular-nums">
-                      {formatTimeAgo(device.lastSeenAt)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                    {showIdle ? "Hide" : "Show"} {idle.length} idle devices
+                  </button>
+                </TableCell>
+              </TableRow>
+            )}
+            {visibleIdle &&
+              idle.map((device) => (
+                <DeviceTableRow
+                  key={device.id}
+                  device={device}
+                  selectedId={selectedId}
+                  todayMaximum={todayMaximum}
+                  onSelect={onSelect}
+                />
+              ))}
+          </TableBody>
+        </Table>
       )}
     </Card>
+  );
+}
+
+function DeviceTableRow({
+  device,
+  selectedId,
+  todayMaximum,
+  onSelect,
+}: {
+  device: MergedDevice;
+  selectedId: string | null;
+  todayMaximum: number;
+  onSelect: (deviceId: string) => void;
+}) {
+  const firstIp = device.ips[0];
+  const extra = Math.max(0, device.ips.length - 1);
+  const DeviceIcon = deviceIcon(device.iconId, device.name);
+
+  return (
+    <TableRow
+      className={cn("hover:bg-muted cursor-pointer", selectedId === device.id && "bg-muted")}
+      onClick={() => onSelect(device.id)}
+    >
+      <TableCell className="px-4">
+        <StatusDot tone={device.online ? "ok" : "muted"} />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2.5">
+          <span className="bg-muted ring-border inline-flex size-7 shrink-0 items-center justify-center rounded-md ring-1">
+            <DeviceIcon className="text-muted-foreground size-3.5" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-foreground truncate font-medium">{device.name}</div>
+            {!isHiddenMac(device.mac) && (
+              <div className="text-muted-foreground font-mono text-2xs tabular-nums">
+                {device.mac}
+              </div>
+            )}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground font-mono text-xs tabular-nums">
+        {firstIp ?? "None"}
+        {extra > 0 && <span> +{extra}</span>}
+      </TableCell>
+      <TableCell className="text-foreground text-right font-mono text-xs tabular-nums">
+        {formatRate(device.rateIn)}
+      </TableCell>
+      <TableCell className="text-foreground text-right font-mono text-xs tabular-nums">
+        {formatRate(device.rateOut)}
+      </TableCell>
+      <TableCell
+        className="text-muted-foreground font-mono text-xs tabular-nums"
+        title={`↓ ${formatBytes(device.todayIn)} · ↑ ${formatBytes(device.todayOut)}`}
+      >
+        <div className="flex items-center justify-end gap-3">
+          <SplitBar
+            className="w-20 shrink-0"
+            inValue={device.todayIn}
+            outValue={device.todayOut}
+            max={todayMaximum}
+          />
+          <span className="w-16 shrink-0 text-right">
+            {formatBytes(device.todayIn + device.todayOut)}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground px-4 font-mono text-xs tabular-nums">
+        {formatTimeAgo(device.lastSeenAt)}
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -469,37 +522,38 @@ function DeviceInspector({
       ) : (
         <>
           <InspectorSection title="Identity">
-            <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13px]">
-              <dt className="text-muted-foreground">IPs</dt>
-              <dd className="min-w-0 space-y-0.5 font-mono tabular-nums">
-                {device.ips.length > 0
-                  ? device.ips.map((ip) => <div key={ip}>{ip}</div>)
-                  : "None"}
-              </dd>
-              <dt className="text-muted-foreground">First seen</dt>
-              <dd className="font-mono tabular-nums">{formatTimeAgo(device.firstSeenAt)}</dd>
-              <dt className="text-muted-foreground">Last seen</dt>
-              <dd className="font-mono tabular-nums">{formatTimeAgo(device.lastSeenAt)}</dd>
-              <dt className="text-muted-foreground">Managed</dt>
-              <dd>
+            <DetailList>
+              <DetailRow label="IPs">
+                <div className="min-w-0 space-y-0.5 font-mono tabular-nums">
+                  {device.ips.length > 0
+                    ? device.ips.map((ip) => <div key={ip}>{ip}</div>)
+                    : "None"}
+                </div>
+              </DetailRow>
+              <DetailRow label="First seen">
+                <span className="font-mono tabular-nums">{formatTimeAgo(device.firstSeenAt)}</span>
+              </DetailRow>
+              <DetailRow label="Last seen">
+                <span className="font-mono tabular-nums">{formatTimeAgo(device.lastSeenAt)}</span>
+              </DetailRow>
+              <DetailRow label="Managed">
                 {device.managed ? <Badge tone="primary">Surge</Badge> : <span>Not managed</span>}
-              </dd>
+              </DetailRow>
               {device.iconId && (
-                <>
-                  <dt className="text-muted-foreground">Icon id</dt>
-                  <dd className="text-muted-foreground min-w-0 truncate font-mono">
+                <DetailRow label="Icon id">
+                  <span className="text-muted-foreground block min-w-0 truncate font-mono">
                     {device.iconId}
-                  </dd>
-                </>
+                  </span>
+                </DetailRow>
               )}
-            </dl>
+            </DetailList>
           </InspectorSection>
 
           <InspectorSection title="Now">
             <div className="bg-muted/40 ring-border grid grid-cols-2 gap-4 rounded-lg p-3 ring-1">
               <Stat
                 label="Down"
-                value={<span className="font-mono text-base">{formatRate(rateIn)}</span>}
+                value={<span className="font-mono">{formatRate(rateIn)}</span>}
                 sub={
                   <span className="inline-flex items-center gap-1 font-mono tabular-nums">
                     Today <ArrowDown className="size-3 shrink-0" /> {formatBytes(device.todayIn)}
@@ -508,7 +562,7 @@ function DeviceInspector({
               />
               <Stat
                 label="Up"
-                value={<span className="font-mono text-base">{formatRate(rateOut)}</span>}
+                value={<span className="font-mono">{formatRate(rateOut)}</span>}
                 sub={
                   <span className="inline-flex items-center gap-1 font-mono tabular-nums">
                     Today <ArrowUp className="size-3 shrink-0" /> {formatBytes(device.todayOut)}
@@ -533,19 +587,21 @@ function DeviceInspector({
               to={rangeTo}
             />
             {detail.presence.length === 0 && <div className="bg-muted h-1.5 rounded-full" />}
-            <p className="text-muted-foreground mt-2 text-[11px]">
+            <p className="text-muted-foreground mt-2 text-2xs">
               online periods · {isCustom ? label : `last ${label}`}
             </p>
           </InspectorSection>
 
           <InspectorSection title="Top hosts">
             {detail.topHosts.length > 0 ? (
-              <BarsList
-                rows={detail.topHosts.slice(0, 8).map((row) => ({
+              <RowList
+                bars
+                mono
+                items={detail.topHosts.slice(0, 8).map((row) => ({
                   key: row.key,
                   label: row.key,
                   value: row.bytesIn + row.bytesOut,
-                  sub: `${row.flows} flows`,
+                  sub: `${row.flows} flow${row.flows === 1 ? "" : "s"}`,
                 }))}
                 onSelect={(host) => router.push(flowsHref(deviceId, { search: host }))}
               />
@@ -563,7 +619,7 @@ function DeviceInspector({
                     className="bg-muted/50 ring-border inline-flex items-center gap-2 rounded-md px-2 py-1 ring-1"
                   >
                     <CountryChip code={row.key} />
-                    <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+                    <span className="text-muted-foreground font-mono text-2xs tabular-nums">
                       {formatBytes(row.bytesIn + row.bytesOut)}
                     </span>
                   </span>
@@ -576,12 +632,14 @@ function DeviceInspector({
 
           <InspectorSection title="Processes">
             {detail.topProcesses.length > 0 ? (
-              <BarsList
-                rows={detail.topProcesses.slice(0, 6).map((row) => ({
+              <RowList
+                bars
+                mono
+                items={detail.topProcesses.slice(0, 6).map((row) => ({
                   key: row.key,
                   label: row.key,
                   value: row.bytesIn + row.bytesOut,
-                  sub: `${row.flows} flows`,
+                  sub: `${row.flows} flow${row.flows === 1 ? "" : "s"}`,
                 }))}
                 onSelect={(process) => router.push(flowsHref(deviceId, { process }))}
               />
@@ -596,10 +654,10 @@ function DeviceInspector({
                 {detail.topPorts.slice(0, 6).map((row) => {
                   const service = serviceForPort(Number(row.key));
                   return (
-                    <div key={row.key} className="flex items-center gap-2 text-xs">
-                      <span className="font-mono tabular-nums">:{row.key}</span>
-                      {service && <span className="text-muted-foreground">{service}</span>}
-                      <span className="text-muted-foreground ms-auto font-mono tabular-nums">
+                    <div key={row.key} className="flex items-center gap-2">
+                      <span className="font-mono text-xs tabular-nums">:{row.key}</span>
+                      {service && <span className="text-muted-foreground text-2xs">{service}</span>}
+                      <span className="text-muted-foreground ms-auto font-mono text-xs tabular-nums">
                         {formatBytes(row.bytesIn + row.bytesOut)}
                       </span>
                     </div>
@@ -653,14 +711,14 @@ function DeviceInspector({
             {detail.recentFlows.length > 0 ? (
               <div className="divide-border divide-y">
                 {detail.recentFlows.slice(0, 10).map((flow) => (
-                  <div key={flow.id} className="flex items-center gap-2 py-2 text-xs first:pt-0">
-                    <span className="text-muted-foreground w-14 shrink-0 font-mono tabular-nums">
+                  <div key={flow.id} className="flex items-center gap-2 py-2 first:pt-0">
+                    <span className="text-muted-foreground w-14 shrink-0 font-mono text-2xs tabular-nums">
                       {formatTime(flow.ts)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate">
+                    <span className="min-w-0 flex-1 truncate text-sm">
                       {flow.dst.host || flow.dst.ip || "Unknown"}
                     </span>
-                    <span className="text-muted-foreground shrink-0 font-mono tabular-nums">
+                    <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
                       {formatBytes(flow.bytesIn + flow.bytesOut)}
                     </span>
                   </div>

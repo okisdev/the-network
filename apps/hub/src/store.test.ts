@@ -561,6 +561,95 @@ describe('Store', () => {
     });
   });
 
+  it('orders breakdowns by aggregate bytes instead of representative rows', () => {
+    store.upsertDevice({
+      id: 'device-1',
+      name: 'Laptop',
+      firstSeenAt: NOW - 4 * 60_000,
+      lastSeenAt: NOW,
+    });
+    store.writeFlush({
+      flows: [
+        {
+          id: 'aggregate-many-first',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 4 * 60_000,
+          host: 'api.example.com',
+          port: 443,
+          process: 'Browser',
+          bytesIn: 10,
+          bytesOut: 10,
+          state: 'completed',
+        },
+        {
+          id: 'aggregate-single',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 3 * 60_000,
+          host: 'dns.other.net',
+          port: 53,
+          process: 'Resolver',
+          bytesIn: 25,
+          bytesOut: 25,
+          state: 'completed',
+        },
+        {
+          id: 'aggregate-many-last',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 2 * 60_000,
+          host: 'api.example.com',
+          port: 443,
+          process: 'Browser',
+          bytesIn: 10,
+          bytesOut: 10,
+          state: 'completed',
+        },
+        {
+          id: 'aggregate-many-final',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 60_000,
+          host: 'api.example.com',
+          port: 443,
+          process: 'Browser',
+          bytesIn: 10,
+          bytesOut: 10,
+          state: 'completed',
+        },
+      ],
+    });
+
+    expect(
+      store.breakdown('port', 5, undefined, 10, NOW).rows.map((row) => ({
+        key: row.key,
+        bytes: row.bytesIn + row.bytesOut,
+      })),
+    ).toEqual([
+      { key: '443', bytes: 60 },
+      { key: '53', bytes: 50 },
+    ]);
+    expect(
+      store.breakdown('process', 5, undefined, 10, NOW).rows.map((row) => ({
+        key: row.key,
+        bytes: row.bytesIn + row.bytesOut,
+      })),
+    ).toEqual([
+      { key: 'Browser', bytes: 60 },
+      { key: 'Resolver', bytes: 50 },
+    ]);
+    expect(
+      store.deviceRollupBreakdown('device-1', 'host', 5, 10, NOW).map((row) => ({
+        key: row.key,
+        bytes: row.bytesIn + row.bytesOut,
+      })),
+    ).toEqual([
+      { key: 'example.com', bytes: 60 },
+      { key: 'other.net', bytes: 50 },
+    ]);
+  });
+
   it('aggregates only hostless traffic in explicit direct-IP breakdown windows', () => {
     const from = NOW - 120_000;
     const to = NOW - 20_000;

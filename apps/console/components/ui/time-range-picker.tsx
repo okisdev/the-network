@@ -88,7 +88,7 @@ export function TimeRangePicker() {
           <PresetGroup title="Calendar" presets={CALENDAR_PRESETS} range={range} onSelect={selectPreset} />
         </div>
         <form className="mt-3 border-t pt-3" onSubmit={apply}>
-          <div className="text-muted-foreground mb-1.5 text-[11px] font-medium uppercase tracking-wide">Custom</div>
+          <div className="text-muted-foreground mb-1.5 text-2xs font-medium uppercase tracking-wide">Custom</div>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <label htmlFor="custom-range-start" className="text-muted-foreground text-xs font-medium">
@@ -135,7 +135,7 @@ export function TimeRangePicker() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-auto px-1.5 py-1 text-[11px]"
+                className="h-auto px-1.5 py-1 text-2xs"
                 onClick={() => {
                   clearCustom();
                   setOpen(false);
@@ -146,7 +146,7 @@ export function TimeRangePicker() {
             )}
           </div>
         </form>
-        <p className="text-muted-foreground mt-3 border-t pt-2 text-[11px]">
+        <p className="text-muted-foreground mt-3 border-t pt-2 text-2xs">
           Minute detail up to 48 h · hourly beyond · flow-level views keep 14 days
         </p>
       </PopoverContent>
@@ -167,7 +167,7 @@ function PresetGroup({
 }) {
   return (
     <div>
-      <div className="text-muted-foreground mb-1.5 text-[11px] font-medium uppercase tracking-wide">{title}</div>
+      <div className="text-muted-foreground mb-1.5 text-2xs font-medium uppercase tracking-wide">{title}</div>
       <div>
         {presets.map((preset) => {
           const active = range === preset;
@@ -182,7 +182,7 @@ function PresetGroup({
               }`}
             >
               <span>{TIME_RANGES[preset].label}</span>
-              {hint && <span className="text-muted-foreground font-mono text-[11px] tabular-nums">{hint}</span>}
+              {hint && <span className="text-muted-foreground font-mono text-2xs tabular-nums">{hint}</span>}
             </button>
           );
         })}

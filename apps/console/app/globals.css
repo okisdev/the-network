@@ -95,6 +95,8 @@
   --color-chart-8: var(--chart-8);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.875rem;

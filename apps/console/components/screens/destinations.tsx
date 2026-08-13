@@ -10,12 +10,10 @@ import type {
   SankeyDto,
   TimeseriesPoint,
 } from "@the-network/schema";
-import { ArrowLeft, Download, X } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { BarsList } from "@/components/charts/bars-list";
 import { DonutChart } from "@/components/charts/donut";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { SankeyFlow } from "@/components/charts/sankey-flow";
@@ -31,6 +29,7 @@ import { Empty } from "@/components/ui/empty";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { RowList } from "@/components/ui/row-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -149,6 +148,7 @@ function CountriesPanel({
   return (
     <Card
       title="Countries"
+      note="Proxied traffic is mapped to its declared exit region"
       action={
         selected ? <ArrowLink href={flowHref({ country: selected })}>Flows</ArrowLink> : undefined
       }
@@ -169,7 +169,7 @@ function CountriesPanel({
               <CountryChip code={selected} />
             </div>
             {selectedCountry && (
-              <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+              <span className="text-muted-foreground text-2xs shrink-0 font-mono tabular-nums">
                 {formatBytes(countryBytes(selectedCountry))} · {selectedCountry.flows} flows
               </span>
             )}
@@ -181,8 +181,9 @@ function CountriesPanel({
           ) : deviceRows.length === 0 ? (
             <Empty message="No devices for this country" />
           ) : (
-            <BarsList
-              rows={deviceRows}
+            <RowList
+              bars
+              items={deviceRows}
               onSelect={(key) => router.push(`/devices?device=${encodeURIComponent(key)}`)}
             />
           )}
@@ -193,28 +194,24 @@ function CountriesPanel({
           hint="Traffic starts mapping once flows carry GeoIP"
         />
       ) : (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col">
           {top.map((country) => {
             const bytes = countryBytes(country);
             const code = country.code.toUpperCase();
-            const isSelected = selected === code;
 
             return (
               <div
                 key={code}
-                className={`focus-within:ring-ring flex items-stretch rounded-lg transition-colors duration-150 focus-within:ring-2 ${
-                  isSelected ? "bg-popover ring-primary ring-1" : "hover:bg-muted"
-                }`}
+                className="hover:bg-muted focus-within:ring-ring -mx-2 flex items-stretch rounded-md px-2 py-1.5 transition-colors duration-100 focus-within:ring-2"
               >
                 <button
                   type="button"
                   onClick={() => onSelect(code)}
-                  aria-pressed={isSelected}
-                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left focus-visible:outline-none"
+                  className="min-w-0 flex-1 text-left focus-visible:outline-none"
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <CountryChip code={code} />
-                    <span className="font-mono text-[11px] tabular-nums">{formatBytes(bytes)}</span>
+                    <span className="font-mono text-xs tabular-nums">{formatBytes(bytes)}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <div className="bg-muted h-1 flex-1 overflow-hidden rounded-full">
@@ -223,25 +220,22 @@ function CountriesPanel({
                         style={{ width: `${Math.max(2, (bytes / maxBytes) * 100)}%` }}
                       />
                     </div>
-                    <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
+                    <span className="text-muted-foreground text-2xs font-mono tabular-nums">
                       {country.flows} · {((bytes / totalBytes) * 100).toFixed(0)}%
                     </span>
                   </div>
                 </button>
                 <ArrowLink
                   href={flowHref({ country: code })}
-                  className="shrink-0 rounded-lg px-2 text-[11px] focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                  className="focus-visible:ring-ring shrink-0 rounded-md px-2 focus-visible:ring-2 focus-visible:outline-none"
                 >
-                  flows
+                  Flows
                 </ArrowLink>
               </div>
             );
           })}
         </div>
       )}
-      <p className="text-muted-foreground mt-3 text-xs">
-        Proxied traffic is mapped to its declared exit region
-      </p>
     </Card>
   );
 }
@@ -268,11 +262,11 @@ function HostsTable({
     <Table className="min-w-[520px]">
       <TableHead>
         <TableRow>
-          <TableHeader>Host</TableHeader>
+          <TableHeader className="px-4">Host</TableHeader>
           <TableHeader>Country</TableHeader>
           <TableHeader className="text-right">Traffic</TableHeader>
           <TableHeader className="text-right">Flows</TableHeader>
-          <TableHeader className="text-right">Devices</TableHeader>
+          <TableHeader className="px-4 text-right">Devices</TableHeader>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -289,7 +283,7 @@ function HostsTable({
               onKeyDown={(event) => activateRow(event, inspect)}
               className="hover:bg-muted focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
             >
-              <TableCell className="max-w-0 truncate font-mono text-[12px]" title={host.host}>
+              <TableCell className="max-w-0 truncate px-4 font-mono text-xs" title={host.host}>
                 {host.host}
               </TableCell>
               <TableCell>
@@ -299,13 +293,13 @@ function HostsTable({
                   <span className="text-muted-foreground text-xs">Unknown</span>
                 )}
               </TableCell>
-              <TableCell className="text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-right font-mono text-xs tabular-nums">
                 {formatBytes(host.bytes)}
               </TableCell>
-              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                 {host.flows}
               </TableCell>
-              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-muted-foreground px-4 text-right font-mono text-xs tabular-nums">
                 {host.devices}
               </TableCell>
             </TableRow>
@@ -366,15 +360,19 @@ function MapTab({
 
   return (
     <div className="grid grid-cols-12 gap-4">
-      <Card title="Map" className="col-span-12 xl:col-span-8">
-        <WorldMap
-          countries={countries}
-          cities={cities}
-          selected={selected}
-          onSelect={onSelectCountry}
-        />
+      <Card fill title="Map" className="col-span-12 xl:col-span-8">
+        <div className="flex min-h-0 flex-1 items-center">
+          <div className="w-full">
+            <WorldMap
+              countries={countries}
+              cities={cities}
+              selected={selected}
+              onSelect={onSelectCountry}
+            />
+          </div>
+        </div>
       </Card>
-      <div className="col-span-12 xl:col-span-4">
+      <div className="col-span-12 xl:col-span-4 xl:self-start">
         <CountriesPanel
           countries={countries}
           selected={selected}
@@ -382,7 +380,7 @@ function MapTab({
           onClear={onClearCountry}
         />
       </div>
-      <Card title="Hosts" className="col-span-12">
+      <Card flush title="Hosts" className="col-span-12">
         <HostsTable hosts={hosts} onSelect={onSelectHost} />
       </Card>
     </div>
@@ -407,12 +405,12 @@ function DomainTable({
     <Table className="min-w-[820px]">
       <TableHead>
         <TableRow>
-          <TableHeader>Domain</TableHeader>
+          <TableHeader className="px-4">Domain</TableHeader>
           <TableHeader>Country</TableHeader>
           <TableHeader className="text-right">Devices</TableHeader>
           <TableHeader className="text-right">Flows</TableHeader>
           <TableHeader className="w-44 text-right">Traffic</TableHeader>
-          <TableHeader className="w-32">Trend</TableHeader>
+          <TableHeader className="w-32 px-4">Trend</TableHeader>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -433,7 +431,7 @@ function DomainTable({
               onKeyDown={(event) => activateRow(event, inspect)}
               className="hover:bg-muted focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
             >
-              <TableCell className="max-w-64 font-mono text-[12px]" title={row.key}>
+              <TableCell className="max-w-64 px-4 font-mono text-xs" title={row.key}>
                 <span className="flex items-center gap-2">
                   <DomainFavicon domain={row.key} />
                   <span className="truncate">{row.key}</span>
@@ -446,10 +444,10 @@ function DomainTable({
                   <span className="text-muted-foreground text-xs">—</span>
                 )}
               </TableCell>
-              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                 {row.devices ?? 0}
               </TableCell>
-              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                 {row.flows}
               </TableCell>
               <TableCell>
@@ -459,12 +457,12 @@ function DomainTable({
                     outValue={row.bytesOut}
                     max={maximum}
                   />
-                  <div className="text-muted-foreground mt-1 text-right font-mono text-[11px] tabular-nums">
+                  <div className="text-muted-foreground text-2xs mt-1 text-right font-mono tabular-nums">
                     {formatBytes(breakdownBytes(row))}
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="px-4">
                 {trend?.isLoading ? (
                   <Skeleton className="h-7 w-full" />
                 ) : points.length >= 2 ? (
@@ -489,12 +487,12 @@ function DirectIpsTable({ rows, onSelect }: { rows: BreakdownRow[]; onSelect: (i
     <Table className="min-w-[620px]">
       <TableHead>
         <TableRow>
-          <TableHeader>IP</TableHeader>
+          <TableHeader className="px-4">IP</TableHeader>
           <TableHeader>Country</TableHeader>
           <TableHeader>Network</TableHeader>
           <TableHeader className="text-right">Devices</TableHeader>
           <TableHeader className="text-right">Flows</TableHeader>
-          <TableHeader className="w-52 text-right">Traffic</TableHeader>
+          <TableHeader className="w-44 px-4 text-right">Traffic</TableHeader>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -510,7 +508,7 @@ function DirectIpsTable({ rows, onSelect }: { rows: BreakdownRow[]; onSelect: (i
               onKeyDown={(event) => activateRow(event, select)}
               className="hover:bg-muted focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
             >
-              <TableCell className="font-mono text-[12px]">{row.key}</TableCell>
+              <TableCell className="px-4 font-mono text-xs">{row.key}</TableCell>
               <TableCell>
                 {row.country ? (
                   <CountryChip code={row.country} />
@@ -519,20 +517,20 @@ function DirectIpsTable({ rows, onSelect }: { rows: BreakdownRow[]; onSelect: (i
                 )}
               </TableCell>
               <TableCell className="max-w-64">
-                <span className="block truncate text-[12px]" title={row.label}>
+                <span className="block truncate text-xs" title={row.label}>
                   {row.label ?? "—"}
                 </span>
               </TableCell>
-              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                 {row.devices ?? 0}
               </TableCell>
-              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+              <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                 {row.flows}
               </TableCell>
-              <TableCell>
-                <div className="ml-auto w-40">
+              <TableCell className="px-4">
+                <div className="ml-auto w-36">
                   <SplitBar inValue={row.bytesIn} outValue={row.bytesOut} max={maximum} />
-                  <div className="text-muted-foreground mt-1 text-right font-mono text-[11px] tabular-nums">
+                  <div className="text-muted-foreground text-2xs mt-1 text-right font-mono tabular-nums">
                     {formatBytes(breakdownBytes(row))}
                   </div>
                 </div>
@@ -612,8 +610,9 @@ function HostInspector({
           </InspectorSection>
           <InspectorSection title="Devices">
             {detail.devices.length > 0 ? (
-              <BarsList
-                rows={detail.devices.slice(0, 8).map((row) => ({
+              <RowList
+                bars
+                items={detail.devices.slice(0, 8).map((row) => ({
                   key: row.key,
                   label: row.label ?? row.key,
                   value: breakdownBytes(row),
@@ -627,8 +626,9 @@ function HostInspector({
           </InspectorSection>
           <InspectorSection title="Processes">
             {detail.processes.length > 0 ? (
-              <BarsList
-                rows={detail.processes.slice(0, 6).map((row) => ({
+              <RowList
+                bars
+                items={detail.processes.slice(0, 6).map((row) => ({
                   key: row.key,
                   label: row.label ?? row.key,
                   value: breakdownBytes(row),
@@ -647,10 +647,10 @@ function HostInspector({
                   const service = serviceForPort(Number(row.key));
                   return (
                     <div key={row.key} className="flex items-baseline justify-between gap-3">
-                      <span className="truncate font-mono text-[12px]">
+                      <span className="truncate font-mono text-xs">
                         :{row.key}{service ? ` · ${service}` : ""}
                       </span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+                      <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
                         {formatBytes(breakdownBytes(row))}
                       </span>
                     </div>
@@ -670,17 +670,17 @@ function HostInspector({
                 {detail.recentFlows.slice(0, 10).map((flow) => {
                   const destination = flow.dst.host ?? flow.dst.ip ?? "Unknown";
                   return (
-                    <div key={flow.id} className="flex items-baseline gap-2 text-[12px]">
-                      <span className="text-muted-foreground w-16 shrink-0 font-mono tabular-nums">
+                    <div key={flow.id} className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-2xs w-16 shrink-0 font-mono tabular-nums">
                         {formatTime(flow.ts)}
                       </span>
-                      <span className="min-w-0 flex-1 truncate" title={destination}>
+                      <span className="min-w-0 flex-1 truncate font-mono text-xs" title={destination}>
                         {destination}
                         {flow.dst.port != null && (
                           <span className="text-muted-foreground">:{flow.dst.port}</span>
                         )}
                       </span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+                      <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
                         {formatBytes(flow.bytesIn + flow.bytesOut)}
                       </span>
                     </div>
@@ -755,22 +755,25 @@ function DomainsTab({
 
   return (
     <>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input
+          type="search"
+          aria-label="Search domains"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search three months of domains"
+          className="w-full max-w-96"
+        />
+        {!searchQuery && (
+          <span className="text-muted-foreground text-xs">
+            Search across the entire retained history
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-12 gap-4">
-        <Card title="Find a domain" className="col-span-12">
-          <Input
-            type="search"
-            aria-label="Search domains"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search three months of domains"
-            className="w-full"
-          />
-          <div className="mt-3">
-            {!searchQuery ? (
-              <p className="text-muted-foreground text-xs">
-                Search across the entire retained history
-              </p>
-            ) : searchQuery !== catalogQuery || (catalogLoading && !catalogDomains) ? (
+        {searchQuery && (
+          <Card title="Search results" className="col-span-12">
+            {searchQuery !== catalogQuery || (catalogLoading && !catalogDomains) ? (
               <Skeleton className="h-24 w-full" />
             ) : catalogError ? (
               <Empty message="Domain search is not available yet" />
@@ -783,17 +786,17 @@ function DomainsTab({
                     key={row.domain}
                     type="button"
                     onClick={() => onSelect(row.domain)}
-                    className="hover:bg-muted focus-visible:ring-ring -mx-1.5 flex items-center gap-2 rounded-sm px-1.5 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
+                    className="hover:bg-muted focus-visible:ring-ring -mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-100 focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <DomainFavicon domain={row.domain} />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs">
                       {row.domain}
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className="block font-mono text-[12px] tabular-nums">
+                      <span className="block font-mono text-xs tabular-nums">
                         {formatBytes(row.bytesIn + row.bytesOut)}
                       </span>
-                      <span className="text-muted-foreground block text-[11px]">
+                      <span className="text-muted-foreground text-2xs block">
                         first seen {formatTimeAgo(row.firstSeen)} · last {formatTimeAgo(row.lastSeen)}
                       </span>
                     </span>
@@ -801,11 +804,11 @@ function DomainsTab({
                 ))}
               </div>
             )}
-          </div>
-        </Card>
+          </Card>
+        )}
         <Card title="Domains by volume" className="col-span-12">
           {isLoading && !data ? (
-            <Skeleton className="h-[300px] w-full" />
+            <Skeleton className="h-[360px] w-full" />
           ) : isError ? (
             <Empty message="Domain breakdown is not available yet" />
           ) : rows.length === 0 ? (
@@ -817,12 +820,13 @@ function DomainsTab({
                 label: row.key,
                 value: breakdownBytes(row),
               }))}
-              height={300}
+              height={360}
               onSelect={onSelect}
             />
           )}
         </Card>
         <Card
+          flush
           title="Top domains"
           action={
             <Button
@@ -859,7 +863,12 @@ function DomainsTab({
             <DomainTable rows={visibleRows} hosts={hosts} trends={trends} onSelect={onSelect} />
           )}
         </Card>
-        <Card title="Direct IPs" className="col-span-12">
+        <Card
+          flush
+          title="Direct IPs"
+          note="Connections that never presented a hostname"
+          className="col-span-12"
+        >
           {directIpsLoading && !directIpData ? (
             <Skeleton className="h-64 w-full" />
           ) : (
@@ -868,9 +877,6 @@ function DomainsTab({
               onSelect={(ip) => router.push(flowHref({ search: ip }))}
             />
           )}
-          <p className="text-muted-foreground mt-3 text-xs">
-            Connections that never presented a hostname
-          </p>
         </Card>
       </div>
       <HostInspector
@@ -926,15 +932,19 @@ function PortsTab({ rangeQuery }: { rangeQuery: RangeQuery }) {
 
   return (
     <div className="grid grid-cols-12 gap-4">
-      <Card title="Protocols" className="col-span-12 lg:col-span-4">
+      <Card fill title="Protocols" className="col-span-12 lg:col-span-4">
         {protocolsLoading && !protocolData ? (
-          <Skeleton className="h-52 w-full" />
+          <Skeleton className="min-h-52 w-full flex-1" />
         ) : protocolsError ? (
-          <Empty message="Protocol breakdown is not available yet" />
+          <div className="flex flex-1 items-center justify-center">
+            <Empty message="Protocol breakdown is not available yet" />
+          </div>
         ) : protocolRows.length === 0 ? (
-          <Empty message="No protocol traffic yet" />
+          <div className="flex flex-1 items-center justify-center">
+            <Empty message="No protocol traffic yet" />
+          </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-center gap-6 lg:flex-col xl:flex-row">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <DonutChart
               slices={protocolRows.map((row) => ({
                 key: row.key,
@@ -945,7 +955,7 @@ function PortsTab({ rangeQuery }: { rangeQuery: RangeQuery }) {
               centerLabel={formatBytes(protocolTotal)}
               centerSub="traffic"
             />
-            <div className="min-w-32 flex-1 space-y-2">
+            <div className="min-w-32 space-y-2">
               {protocolRows.map((row) => {
                 const key = row.key.toLowerCase();
                 return (
@@ -957,7 +967,7 @@ function PortsTab({ rangeQuery }: { rangeQuery: RangeQuery }) {
                       />
                       {key}
                     </span>
-                    <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+                    <span className="text-muted-foreground text-2xs font-mono tabular-nums">
                       {row.flows} flows
                     </span>
                   </div>
@@ -975,13 +985,16 @@ function PortsTab({ rangeQuery }: { rangeQuery: RangeQuery }) {
         ) : portRows.length === 0 ? (
           <Empty message="No port traffic yet" />
         ) : (
-          <BarsList
-            rows={portRows.map((row) => {
+          <RowList
+            bars
+            mono
+            items={portRows.map((row) => {
               const service = serviceForPort(Number(row.key));
+              const devices = row.devices ?? 0;
               return {
                 key: row.key,
                 label: `:${row.key}${service ? ` · ${service}` : ""}`,
-                sub: `${row.flows} flows · ${row.devices ?? 0} devices`,
+                sub: `${row.flows.toLocaleString()} flow${row.flows === 1 ? "" : "s"} · ${devices.toLocaleString()} device${devices === 1 ? "" : "s"}`,
                 value: breakdownBytes(row),
               };
             })}
@@ -995,15 +1008,20 @@ function PortsTab({ rangeQuery }: { rangeQuery: RangeQuery }) {
         ) : networksError ? (
           <Empty message="Network breakdown is not available yet" />
         ) : networkRows.length === 0 ? (
-          <Empty message="No AS data yet — run scripts/update-asn.mjs to fetch the offline database" />
+          <Empty message="No AS data yet. Run scripts/update-asn.mjs to fetch the offline database" />
         ) : (
-          <BarsList
-            rows={networkRows.map((row) => ({
-              key: row.key,
-              label: row.label ?? `AS${row.key}`,
-              sub: `AS${row.key} · ${row.flows.toLocaleString()} flows · ${row.devices ?? 0} devices`,
-              value: breakdownBytes(row),
-            }))}
+          <RowList
+            bars
+            mono
+            items={networkRows.map((row) => {
+              const devices = row.devices ?? 0;
+              return {
+                key: row.key,
+                label: row.label ?? `AS${row.key}`,
+                sub: `AS${row.key} · ${row.flows.toLocaleString()} flow${row.flows === 1 ? "" : "s"} · ${devices.toLocaleString()} device${devices === 1 ? "" : "s"}`,
+                value: breakdownBytes(row),
+              };
+            })}
           />
         )}
       </Card>
@@ -1061,7 +1079,10 @@ function FlowTab({ rangeQuery, rangeLabel }: { rangeQuery: RangeQuery; rangeLabe
 
   return (
     <div className="flex flex-col gap-4">
-      <Card title="Traffic flow">
+      <Card
+        title="Traffic flow"
+        note={`Devices → policies → countries · top 8 per tier · ${rangeLabel}`}
+      >
         {isLoading && !data ? (
           <Skeleton className="h-[420px] w-full" />
         ) : isError ? (
@@ -1069,28 +1090,26 @@ function FlowTab({ rangeQuery, rangeLabel }: { rangeQuery: RangeQuery; rangeLabe
         ) : sankey.links.length === 0 ? (
           <Empty message="No traffic flow yet" />
         ) : (
-          <>
-            <SankeyFlow
-              data={sankey}
-              height={420}
-              onLink={(sourceId, targetId) => {
-                const source = parseSankeyId(sourceId);
-                const target = parseSankeyId(targetId);
-                let href: string | undefined;
-                if (source?.kind === "device") href = flowHref({ device: source.value });
-                else if (source?.kind === "policy") href = flowHref({ policy: source.value });
-                else if (target?.kind === "country") href = flowHref({ country: target.value });
-                else if (target?.kind === "policy") href = flowHref({ policy: target.value });
-                if (href) router.push(href);
-              }}
-            />
-            <p className="text-muted-foreground mt-2 text-xs">
-              Devices → policies → countries · top 8 per tier · {rangeLabel}
-            </p>
-          </>
+          <SankeyFlow
+            data={sankey}
+            height={420}
+            onLink={(sourceId, targetId) => {
+              const source = parseSankeyId(sourceId);
+              const target = parseSankeyId(targetId);
+              let href: string | undefined;
+              if (source?.kind === "device") href = flowHref({ device: source.value });
+              else if (source?.kind === "policy") href = flowHref({ policy: source.value });
+              else if (target?.kind === "country") href = flowHref({ country: target.value });
+              else if (target?.kind === "policy") href = flowHref({ policy: target.value });
+              if (href) router.push(href);
+            }}
+          />
         )}
       </Card>
-      <Card title="Decision chains">
+      <Card
+        title="Decision chains"
+        note="Observed rule → policy group → exit paths · top 12 by traffic"
+      >
         {chainsLoading && !chainsData ? (
           <Skeleton className="h-[380px] w-full" />
         ) : chainsError ? (
@@ -1098,12 +1117,7 @@ function FlowTab({ rangeQuery, rangeLabel }: { rangeQuery: RangeQuery; rangeLabe
         ) : chains.links.length === 0 ? (
           <Empty message="No decision chains recorded yet" />
         ) : (
-          <>
-            <SankeyFlow data={chains} height={380} />
-            <p className="text-muted-foreground mt-2 text-xs">
-              Observed rule → policy group → exit paths · top 12 by traffic
-            </p>
-          </>
+          <SankeyFlow data={chains} height={380} />
         )}
       </Card>
     </div>
@@ -1154,7 +1168,7 @@ export function DestinationsScreen() {
           });
         }}
       >
-        <div className="mb-3">
+        <div className="mb-4">
           <TabsList>
             <TabsTab value="map">Map</TabsTab>
             <TabsTab value="domains">Domains</TabsTab>
