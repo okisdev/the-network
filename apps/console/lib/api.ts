@@ -2,6 +2,7 @@ import type {
   AuthStatusDto,
   BreakdownDim,
   BreakdownDto,
+  CatalogDomainDto,
   CityPoint,
   CountryDeviceShare,
   DailyPoint,
@@ -20,6 +21,8 @@ import type {
   OverviewDto,
   PunchcardDto,
   RejectedSummaryDto,
+  RuleListCoverageDto,
+  RulesInventoryDto,
   SankeyDto,
   SourceDto,
   SourceHealthPoint,
@@ -84,8 +87,14 @@ export const api = {
   timeseriesMulti: (
     query: { scope: "device" | "policy"; limit?: number } & RangeQuery,
   ) => request<MultiSeriesDto[]>(`/api/timeseries/multi${qs(query)}`),
-  breakdown: (query: { dim: BreakdownDim; deviceId?: string; limit?: number } & RangeQuery) =>
-    request<BreakdownDto>(`/api/breakdown${qs(query)}`),
+  breakdown: (
+    query: { dim: BreakdownDim; deviceId?: string; policy?: string; limit?: number } & RangeQuery,
+  ) => request<BreakdownDto>(`/api/breakdown${qs(query)}`),
+  rules: () => request<RulesInventoryDto>("/api/rules"),
+  ruleCoverage: (list: string) =>
+    request<RuleListCoverageDto>(`/api/rules/coverage/${encodeURIComponent(list)}`),
+  catalogDomains: (query: { q?: string; limit?: number } = {}) =>
+    request<CatalogDomainDto[]>(`/api/catalog/domains${qs(query)}`),
   sankey: (query: { limit?: number } & RangeQuery) =>
     request<SankeyDto>(`/api/sankey${qs(query)}`),
   chains: (query: { limit?: number } & RangeQuery) =>

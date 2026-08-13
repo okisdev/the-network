@@ -6,10 +6,13 @@ import fastifyStatic from '@fastify/static';
 import {
   surgeSettingsSchema,
   type AuthStatusDto,
+  type CatalogDomainDto,
   type DeviceDetailDto,
   type FlowsQuery,
   type LogsQuery,
   type OverviewDto,
+  type RuleListCoverageDto,
+  type RulesInventoryDto,
   type SourceHealthPoint,
   type SourceDto,
   type SourceInput,
@@ -18,10 +21,17 @@ import {
 } from '@the-network/schema';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
-import type { HubConfig } from './config.ts';
+import { FLOWS_RETENTION_MS, type HubConfig } from './config.ts';
 import { Pipeline } from './pipeline.ts';
 import { ProbeManager } from './probes.ts';
 import { Realtime } from './realtime.ts';
+import {
+  buildListCoverage,
+  loadProfile,
+  loadRepoLists,
+  type ParsedRuleList,
+  type ParsedSurgeProfile,
+} from './rules.ts';
 import type { ExplicitWindow, SourceRecord } from './store.ts';
 import { Store } from './store.ts';
 
@@ -133,10 +143,16 @@ const breakdownQuerySchema = z
     dim: z.enum(['process', 'port', 'proto', 'rule', 'policy', 'country', 'host', 'domain', 'ip', 'asn']),
     minutes: minutesSchema,
     deviceId: z.string().min(1).optional(),
+    policy: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(12),
     ...windowFields,
   })
   .superRefine(validateWindow);
+
+const catalogDomainsQuerySchema = z.object({
+  q: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 const sankeyQuerySchema = z
   .object({
@@ -184,6 +200,7 @@ const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const FAVICON_FRESH_MS = 7 * 24 * 60 * 60 * 1_000;
 const FAVICON_NEGATIVE_MS = 60 * 60 * 1_000;
 const FAVICON_TIMEOUT_MS = 4_000;
+const RULES_CACHE_MS = 60_000;
 
 function parseCookies(header: string | undefined): Map<string, string> {
   const cookies = new Map<string, string>();
@@ -236,7 +253,15 @@ function validCredentials(
 }
 
 export interface ApiOptions {
-  config: Pick<HubConfig, 'consoleDist' | 'authToken' | 'dataDir' | 'faviconsEnabled'>;
+  config: Pick<
+    HubConfig,
+    | 'consoleDist'
+    | 'authToken'
+    | 'dataDir'
+    | 'faviconsEnabled'
+    | 'surgeProfilePath'
+    | 'surgeListsDir'
+  >;
   store: Store;
   pipeline: Pipeline;
   probes: ProbeManager;
@@ -281,6 +306,26 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   const fetchFavicon = options.fetch ?? globalThis.fetch;
   const faviconDir = join(options.config.dataDir, 'favicons');
   const faviconMisses = new Map<string, number>();
+  let rulesCache:
+    | { expiresAt: number; profile: ParsedSurgeProfile | undefined; lists: ParsedRuleList[] }
+    | undefined;
+
+  const rulesFiles = async (): Promise<{
+    profile: ParsedSurgeProfile | undefined;
+    lists: ParsedRuleList[];
+  }> => {
+    const now = Date.now();
+    if (rulesCache !== undefined && rulesCache.expiresAt > now) return rulesCache;
+    let profile: ParsedSurgeProfile | undefined;
+    try {
+      profile = await loadProfile(options.config.surgeProfilePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const lists = await loadRepoLists(options.config.surgeListsDir);
+    rulesCache = { expiresAt: now + RULES_CACHE_MS, profile, lists };
+    return rulesCache;
+  };
 
   app.setErrorHandler((error, _request, reply) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -399,6 +444,61 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/system/db', async (): Promise<SystemDbDto> => store.getDatabaseInfo());
 
+  app.get('/api/rules', async (): Promise<RulesInventoryDto> => {
+    const { profile, lists } = await rulesFiles();
+    if (profile === undefined) return { available: false, groups: [], rules: [], lists: [] };
+    const since = Date.now() - FLOWS_RETENTION_MS;
+    const ruleAggregates = new Map(
+      store.getRulesAggregates(since).map((aggregate) => [aggregate.key, aggregate]),
+    );
+    const groupBytes = new Map<string, number>();
+    for (const rule of profile.rules) {
+      groupBytes.set(
+        rule.policy,
+        (groupBytes.get(rule.policy) ?? 0) + (ruleAggregates.get(rule.displayKey)?.bytes ?? 0),
+      );
+    }
+    const groupNames = new Set(profile.groups.map((group) => group.name));
+    const coverageObservations = store.getRulesCoverageObservations(since);
+    return {
+      available: true,
+      groups: profile.groups.map((group) => ({
+        name: group.name,
+        type: group.type,
+        members: group.members.map((name) => ({ name, isGroup: groupNames.has(name) })),
+        bytes: groupBytes.get(group.name) ?? 0,
+      })),
+      rules: profile.rules.map((rule) => {
+        const aggregate = ruleAggregates.get(rule.displayKey);
+        return {
+          ...rule,
+          hits: aggregate?.hits ?? 0,
+          bytes: aggregate?.bytes ?? 0,
+          ...(aggregate === undefined ? {} : { lastHit: aggregate.lastHit }),
+        };
+      }),
+      lists: lists.map((list) => ({
+        name: list.name,
+        path: list.path,
+        entries: list.entries.length,
+        matched: buildListCoverage(list, coverageObservations).matched,
+      })),
+    };
+  });
+
+  app.get<{ Params: { list: string } }>(
+    '/api/rules/coverage/:list',
+    async (request, reply): Promise<RuleListCoverageDto> => {
+      const { lists } = await rulesFiles();
+      const list = lists.find((candidate) => candidate.name === request.params.list);
+      if (list === undefined) return reply.code(404).send({ message: 'Rule list not found' });
+      return buildListCoverage(
+        list,
+        store.getRulesCoverageObservations(Date.now() - FLOWS_RETENTION_MS),
+      );
+    },
+  );
+
   app.get('/api/devices', async () => store.listDeviceDtos(pipeline.deviceRates()));
 
   app.get<{ Params: { id: string } }>('/api/devices/:id/detail', async (request, reply) => {
@@ -439,6 +539,11 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   });
 
   app.get('/api/destinations', async () => store.getDestinations());
+
+  app.get('/api/catalog/domains', async (request): Promise<CatalogDomainDto[]> => {
+    const query = catalogDomainsQuerySchema.parse(request.query);
+    return store.searchCatalogDomains(query.q, query.limit);
+  });
 
   app.get('/api/destinations/cities', async (request) => {
     const query = minutesQuerySchema.parse(request.query);
@@ -495,6 +600,7 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
       query.limit,
       undefined,
       explicitWindow(query),
+      query.policy,
     );
   });
 

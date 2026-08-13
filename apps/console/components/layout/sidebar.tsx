@@ -4,6 +4,7 @@ import {
   ArrowRightLeft,
   Globe,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   type LucideIcon,
   MonitorSmartphone,
@@ -23,6 +24,7 @@ const MONITOR_ITEMS: Array<{ href: string; label: string; icon: LucideIcon }> = 
   { href: "/flows", label: "Flows", icon: ArrowRightLeft },
   { href: "/destinations", label: "Destinations", icon: Globe },
   { href: "/insights", label: "Insights", icon: Sparkles },
+  { href: "/rules", label: "Rules", icon: ListChecks },
   { href: "/logs", label: "Logs", icon: ScrollText },
 ];
 

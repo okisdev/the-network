@@ -5,17 +5,21 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import type { BreakdownRow, MoverRow } from "@the-network/schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { BarsList } from "@/components/charts/bars-list";
 import { DailyBars } from "@/components/charts/daily-bars";
 import { MiniBars } from "@/components/charts/mini-bars";
+import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { Punchcard } from "@/components/charts/punchcard";
 import { Sparkline } from "@/components/charts/sparkline";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
+import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTimeRange } from "@/contexts/timerange-provider";
-import { api } from "@/lib/api";
+import { api, type RangeQuery } from "@/lib/api";
 import { policyColor } from "@/lib/chart-colors";
 import { formatBytes, formatTime, formatTimeAgo } from "@/lib/format";
 
@@ -110,9 +114,142 @@ function MoverCard({
   );
 }
 
+function PolicyInspector({
+  policy,
+  rangeQuery,
+  onClose,
+}: {
+  policy: string | null;
+  rangeQuery: RangeQuery;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { minutes } = rangeQuery;
+  const { data: usage, isLoading: usageLoading } = useQuery({
+    queryKey: ["timeseries", "policy", policy, minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.timeseries({ scope: `policy:${policy!}`, ...rangeQuery }),
+    enabled: Boolean(policy),
+    refetchInterval: 30000,
+  });
+  const { data: destinations, isLoading: destinationsLoading } = useQuery({
+    queryKey: [
+      "breakdown",
+      "domain",
+      "policy",
+      policy,
+      minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+      8,
+    ],
+    queryFn: () => api.breakdown({ dim: "domain", policy: policy!, limit: 8, ...rangeQuery }),
+    enabled: Boolean(policy),
+    refetchInterval: 30000,
+  });
+  const { data: processes, isLoading: processesLoading } = useQuery({
+    queryKey: [
+      "breakdown",
+      "process",
+      "policy",
+      policy,
+      minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+      6,
+    ],
+    queryFn: () => api.breakdown({ dim: "process", policy: policy!, limit: 6, ...rangeQuery }),
+    enabled: Boolean(policy),
+    refetchInterval: 30000,
+  });
+  const destinationRows = destinations?.rows ?? [];
+  const processRows = processes?.rows ?? [];
+
+  return (
+    <InspectorPanel
+      open={Boolean(policy)}
+      onClose={onClose}
+      title={
+        policy ? (
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ background: policyColor(policy) }}
+            />
+            <span className="truncate">{policy}</span>
+          </span>
+        ) : (
+          "Policy"
+        )
+      }
+      sub="policy"
+    >
+      <InspectorSection title="Usage">
+        {usageLoading && !usage ? (
+          <Skeleton className="h-[140px] w-full" />
+        ) : (usage ?? []).length === 0 ? (
+          <Empty message="No usage history yet" />
+        ) : (
+          <MirroredAreaChart points={usage ?? []} height={140} />
+        )}
+      </InspectorSection>
+      <InspectorSection title="Top destinations">
+        {destinationsLoading && !destinations ? (
+          <Skeleton className="h-44 w-full" />
+        ) : destinationRows.length === 0 ? (
+          <Empty message="No destinations yet" />
+        ) : (
+          <BarsList
+            rows={destinationRows.map((row) => ({
+              key: row.key,
+              label: row.key,
+              value: row.bytesIn + row.bytesOut,
+              sub: `${row.flows} flows`,
+            }))}
+            onSelect={(key) =>
+              router.push(`/destinations?tab=domains&host=${encodeURIComponent(key)}`)
+            }
+          />
+        )}
+      </InspectorSection>
+      <InspectorSection title="Top processes">
+        {processesLoading && !processes ? (
+          <Skeleton className="h-36 w-full" />
+        ) : processRows.length === 0 ? (
+          <Empty message="No processes yet" />
+        ) : (
+          <BarsList
+            rows={processRows.map((row) => ({
+              key: row.key,
+              label: row.label ?? row.key,
+              value: row.bytesIn + row.bytesOut,
+              sub: `${row.flows} flows`,
+            }))}
+            onSelect={(key) =>
+              router.push(
+                `/flows?process=${encodeURIComponent(key)}&policy=${encodeURIComponent(policy!)}`,
+              )
+            }
+          />
+        )}
+      </InspectorSection>
+      <InspectorSection title="Filter by">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/flows?policy=${encodeURIComponent(policy!)}`)}
+        >
+          Flows
+        </Button>
+      </InspectorSection>
+    </InspectorPanel>
+  );
+}
+
 export function InsightsScreen() {
   const router = useRouter();
   const { minutes, rangeQuery } = useTimeRange();
+  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null);
   const { data: punchcard, isLoading: punchcardLoading } = useQuery({
     queryKey: ["insights", "punchcard", 28],
     queryFn: () => api.punchcard(28),
@@ -320,10 +457,11 @@ export function InsightsScreen() {
                 const total = points.reduce((sum, point) => sum + point, 0);
                 const color = policyColor(entry.key);
                 return (
-                  <Link
+                  <button
                     key={entry.key}
-                    href={`/flows?policy=${encodeURIComponent(entry.key)}`}
-                    className="ring-border hover:bg-muted rounded-md p-3 ring-1"
+                    type="button"
+                    onClick={() => setSelectedPolicy(entry.key)}
+                    className="ring-border hover:bg-muted hover:ring-primary focus-visible:ring-primary w-full cursor-pointer rounded-md p-3 text-left ring-1 transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
@@ -338,13 +476,18 @@ export function InsightsScreen() {
                       </span>
                     </div>
                     <Sparkline className="mt-3" points={points} stroke={color} />
-                  </Link>
+                  </button>
                 );
               })}
             </div>
           )}
         </Card>
       </div>
+      <PolicyInspector
+        policy={selectedPolicy}
+        rangeQuery={rangeQuery}
+        onClose={() => setSelectedPolicy(null)}
+      />
     </>
   );
 }

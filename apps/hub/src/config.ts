@@ -16,6 +16,8 @@ export interface HubConfig {
   port: number;
   dataDir: string;
   asnDbPath: string;
+  surgeProfilePath: string;
+  surgeListsDir: string;
   consoleDist: string;
   flushIntervalMs: number;
   authToken?: string;
@@ -38,6 +40,11 @@ export function loadConfig(
   const asnDbPath = env.TN_ASN_DB
     ? resolve(cwd, env.TN_ASN_DB)
     : join(dataDir, 'ip2asn-combined.tsv');
+  const surgeProfilePath = env.TN_SURGE_PROFILE
+    ? resolve(cwd, env.TN_SURGE_PROFILE)
+    : join(dataDir, 'surge-profile.conf');
+  // The default assumes the hub process starts from the repository root.
+  const surgeListsDir = resolve(cwd, env.TN_SURGE_LISTS ?? 'config/Surge');
   const consoleDist = env.TN_CONSOLE_DIST
     ? resolve(cwd, env.TN_CONSOLE_DIST)
     : fileURLToPath(new URL('../../console/out/', import.meta.url));
@@ -55,6 +62,8 @@ export function loadConfig(
     port,
     dataDir,
     asnDbPath,
+    surgeProfilePath,
+    surgeListsDir,
     consoleDist,
     flushIntervalMs: 10_000,
     notifyRejectedThreshold,

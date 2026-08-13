@@ -14,7 +14,7 @@ import { ArrowLeft, Download, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { BarsList } from "@/components/charts/bars-list";
 import { DonutChart } from "@/components/charts/donut";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
@@ -29,6 +29,7 @@ import { CountryChip } from "@/components/ui/country-chip";
 import { DomainFavicon } from "@/components/ui/domain-favicon";
 import { Empty } from "@/components/ui/empty";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -43,7 +44,7 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { useTimeRange } from "@/contexts/timerange-provider";
 import { api, type RangeQuery } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv";
-import { formatBytes, formatTime } from "@/lib/format";
+import { formatBytes, formatTime, formatTimeAgo } from "@/lib/format";
 import { registrableDomain, serviceForPort } from "@/lib/net-labels";
 import { useQueryParams } from "@/lib/use-query-params";
 
@@ -91,6 +92,15 @@ function activateRow(event: KeyboardEvent, action: () => void) {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   action();
+}
+
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return debounced;
 }
 
 function CountriesPanel({
@@ -701,7 +711,19 @@ function DomainsTab({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const [search, setSearch] = useState("");
+  const searchQuery = search.trim();
+  const catalogQuery = useDebounced(searchQuery, 300);
   const { minutes } = rangeQuery;
+  const {
+    data: catalogDomains,
+    isLoading: catalogLoading,
+    isError: catalogError,
+  } = useQuery({
+    queryKey: ["catalogDomains", catalogQuery, 20],
+    queryFn: () => api.catalogDomains({ q: catalogQuery, limit: 20 }),
+    enabled: catalogQuery.length > 0,
+  });
   const { data, isLoading, isError } = useQuery({
     queryKey: ["breakdown", "domain", minutes, rangeQuery.from, rangeQuery.to, 40],
     queryFn: () => api.breakdown({ dim: "domain", limit: 40, ...rangeQuery }),
@@ -734,6 +756,53 @@ function DomainsTab({
   return (
     <>
       <div className="grid grid-cols-12 gap-4">
+        <Card title="Find a domain" className="col-span-12">
+          <Input
+            type="search"
+            aria-label="Search domains"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search three months of domains"
+            className="w-full"
+          />
+          <div className="mt-3">
+            {!searchQuery ? (
+              <p className="text-muted-foreground text-xs">
+                Search across the entire retained history
+              </p>
+            ) : searchQuery !== catalogQuery || (catalogLoading && !catalogDomains) ? (
+              <Skeleton className="h-24 w-full" />
+            ) : catalogError ? (
+              <Empty message="Domain search is not available yet" />
+            ) : (catalogDomains ?? []).length === 0 ? (
+              <Empty message="No domain matches" />
+            ) : (
+              <div className="flex flex-col gap-1">
+                {(catalogDomains ?? []).map((row) => (
+                  <button
+                    key={row.domain}
+                    type="button"
+                    onClick={() => onSelect(row.domain)}
+                    className="hover:bg-muted focus-visible:ring-ring -mx-1.5 flex items-center gap-2 rounded-sm px-1.5 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <DomainFavicon domain={row.domain} />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                      {row.domain}
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-mono text-[12px] tabular-nums">
+                        {formatBytes(row.bytesIn + row.bytesOut)}
+                      </span>
+                      <span className="text-muted-foreground block text-[11px]">
+                        first seen {formatTimeAgo(row.firstSeen)} · last {formatTimeAgo(row.lastSeen)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
         <Card title="Domains by volume" className="col-span-12">
           {isLoading && !data ? (
             <Skeleton className="h-[300px] w-full" />

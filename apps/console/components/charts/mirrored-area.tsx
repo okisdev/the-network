@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRate, formatTime } from "@/lib/format";
+import { formatAxisTick, formatPointLabel, formatRate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "./tooltip-style";
 import { useMounted } from "./use-mounted";
@@ -157,7 +157,7 @@ export function MirroredAreaChart({
               dataKey="ts"
               minTickGap={48}
               tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
-              tickFormatter={(value) => formatTime(Number(value)).slice(0, 5)}
+              tickFormatter={(value) => formatAxisTick(Number(value), lastTs - firstTs)}
               tickLine={false}
             />
           )}
@@ -174,7 +174,7 @@ export function MirroredAreaChart({
           <Tooltip
             {...chartTooltipProps}
             formatter={(value, name) => [formatRate(Math.abs(Number(value))), name]}
-            labelFormatter={(value) => formatTime(Number(value))}
+            labelFormatter={(value) => formatPointLabel(Number(value), lastTs - firstTs)}
           />
           <Area
             dataKey="download"

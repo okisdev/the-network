@@ -324,6 +324,66 @@ export interface DnsSummaryDto {
   resolvers: Array<{ server: string; count: number }>;
 }
 
+export interface RuleGroupMemberDto {
+  name: string;
+  isGroup: boolean;
+}
+
+export interface RuleGroupDto {
+  name: string;
+  type: string;
+  members: RuleGroupMemberDto[];
+  bytes: number;
+}
+
+export interface RuleLineDto {
+  index: number;
+  type: string;
+  target?: string;
+  policy: string;
+  displayKey: string;
+  hits: number;
+  bytes: number;
+  lastHit?: number;
+}
+
+export interface RuleListDto {
+  name: string;
+  path: string;
+  entries: number;
+  matched: number;
+}
+
+export interface RulesInventoryDto {
+  available: boolean;
+  groups: RuleGroupDto[];
+  rules: RuleLineDto[];
+  lists: RuleListDto[];
+}
+
+export interface RuleListEntryDto {
+  value: string;
+  type: string;
+  matched: boolean;
+  matchedVia?: 'flows' | 'history';
+  lastSeen?: number;
+}
+
+export interface RuleListCoverageDto {
+  name: string;
+  total: number;
+  matched: number;
+  entries: RuleListEntryDto[];
+}
+
+export interface CatalogDomainDto {
+  domain: string;
+  firstSeen: number;
+  lastSeen: number;
+  bytesIn: number;
+  bytesOut: number;
+}
+
 export interface SourceInput {
   kind: string;
   name: string;

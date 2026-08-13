@@ -20,6 +20,25 @@ export function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString("en-GB", { hour12: false });
 }
 
+const DAY_MS = 86_400_000;
+
+function formatMonthDay(date: Date): string {
+  const month = date.toLocaleString("en-GB", { month: "short" });
+  return `${month} ${date.getDate()}`;
+}
+
+export function formatAxisTick(ts: number, spanMs: number): string {
+  const date = new Date(ts);
+  if (spanMs > 14 * DAY_MS) return formatMonthDay(date);
+  if (spanMs > 2 * DAY_MS) return `${formatMonthDay(date)} ${formatTime(ts).slice(0, 5)}`;
+  return formatTime(ts).slice(0, 5);
+}
+
+export function formatPointLabel(ts: number, spanMs: number): string {
+  if (spanMs > 2 * DAY_MS) return `${formatMonthDay(new Date(ts))} ${formatTime(ts).slice(0, 5)}`;
+  return formatTime(ts);
+}
+
 export function formatTimeAgo(ts: number, now = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - ts) / 1000));
   if (seconds < 5) return "now";

@@ -2,12 +2,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
+  CatalogDomainDto,
   CityPoint,
   DeviceDetailDto,
   DnsSummaryDto,
   FlowsPage,
   HostDetailDto,
   ProbeAdapter,
+  RuleListCoverageDto,
+  RulesInventoryDto,
   SankeyDto,
   SourceHealthPoint,
   SourceDto,
@@ -42,6 +45,8 @@ const fakeAdapter: ProbeAdapter = {
 
 describe('Hub API', () => {
   let dataDir: string;
+  let surgeProfilePath: string;
+  let surgeListsDir: string;
   let db: Database.Database;
   let store: Store;
   let pipeline: Pipeline;
@@ -51,6 +56,9 @@ describe('Hub API', () => {
 
   beforeEach(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'the-network-hub-api-'));
+    surgeProfilePath = join(dataDir, 'surge-profile.conf');
+    surgeListsDir = join(dataDir, 'Surge');
+    mkdirSync(surgeListsDir, { recursive: true });
     db = openDatabase(dataDir);
     store = new Store(db);
     pipeline = new Pipeline(store, new Identity(store), {
@@ -69,6 +77,8 @@ describe('Hub API', () => {
         dataDir,
         consoleDist: join(dataDir, 'missing-console'),
         faviconsEnabled: true,
+        surgeProfilePath,
+        surgeListsDir,
       },
       store,
       pipeline,
@@ -86,6 +96,8 @@ describe('Hub API', () => {
         dataDir,
         consoleDist: join(dataDir, 'missing-console'),
         faviconsEnabled: options.faviconsEnabled ?? true,
+        surgeProfilePath,
+        surgeListsDir,
         ...(options.authToken === undefined ? {} : { authToken: options.authToken }),
       },
       store,
@@ -109,11 +121,22 @@ describe('Hub API', () => {
     expect(loadConfig({ TN_DATA_DIR: dataDir, TN_AUTH_TOKEN: '  shared secret  ' }, dataDir)).toMatchObject({
       authToken: 'shared secret',
       asnDbPath: join(dataDir, 'ip2asn-combined.tsv'),
+      surgeProfilePath: join(dataDir, 'surge-profile.conf'),
+      surgeListsDir: join(dataDir, 'config', 'Surge'),
     });
     expect(loadConfig({ TN_DATA_DIR: dataDir, TN_AUTH_TOKEN: '   ' }, dataDir).authToken).toBeUndefined();
     expect(loadConfig({ TN_DATA_DIR: dataDir, TN_ASN_DB: 'asn.tsv' }, dataDir).asnDbPath).toBe(
       join(dataDir, 'asn.tsv'),
     );
+    expect(
+      loadConfig(
+        { TN_DATA_DIR: dataDir, TN_SURGE_PROFILE: 'profile.conf', TN_SURGE_LISTS: 'lists' },
+        dataDir,
+      ),
+    ).toMatchObject({
+      surgeProfilePath: join(dataDir, 'profile.conf'),
+      surgeListsDir: join(dataDir, 'lists'),
+    });
     expect(
       loadConfig(
         {
@@ -449,6 +472,299 @@ describe('Hub API', () => {
       topDestinations: [{ host: 'example.com', bytes: 500 }],
       policySplit: [{ policy: 'Proxy', bytes: 500 }],
       events: [expect.objectContaining({ kind: 'device_joined' })],
+    });
+  });
+
+  it('returns a rules inventory joined to observed flow decisions without leaking proxy credentials', async () => {
+    const now = Date.now();
+    writeFileSync(
+      surgeProfilePath,
+      `[Proxy]
+Secret Node = vmess, proxy.example, 443, password=top-secret, sni=secret.example
+
+[Proxy Group]
+Child = select, DIRECT
+AI Suite = select, Child, Secret Node, url=https://probe.example, interval=600
+
+[Rule]
+RULE-SET,https://rules.example/Test.list,AI Suite,extended-matching
+FINAL,AI Suite,dns-failed
+`,
+    );
+    writeFileSync(
+      join(surgeListsDir, 'Test.list'),
+      '# observed domains\nDOMAIN-SUFFIX,example.com\nPROCESS-NAME,observed-process\nDOMAIN,unused.test\n',
+    );
+    store.writeFlush({
+      flows: [
+        {
+          id: 'rules-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          host: 'api.example.com',
+          ip: '10.0.0.42',
+          bytesIn: 100,
+          bytesOut: 25,
+          state: 'active',
+          policy: 'Secret Node',
+          policyGroup: 'Secret Node',
+          rule: 'RULE-SET Test.list',
+          process: 'observed-process',
+        },
+      ],
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/api/rules' });
+    const coverageResponse = await app.inject({
+      method: 'GET',
+      url: '/api/rules/coverage/Test.list',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(coverageResponse.statusCode).toBe(200);
+    const inventory = response.json<RulesInventoryDto>();
+    const coverage = coverageResponse.json<RuleListCoverageDto>();
+    expect(inventory).toEqual({
+      available: true,
+      groups: [
+        {
+          name: 'Child',
+          type: 'select',
+          members: [{ name: 'DIRECT', isGroup: false }],
+          bytes: 0,
+        },
+        {
+          name: 'AI Suite',
+          type: 'select',
+          members: [
+            { name: 'Child', isGroup: true },
+            { name: 'Secret Node', isGroup: false },
+          ],
+          bytes: 125,
+        },
+      ],
+      rules: [
+        {
+          index: 0,
+          type: 'RULE-SET',
+          target: 'https://rules.example/Test.list',
+          policy: 'AI Suite',
+          displayKey: 'RULE-SET Test.list',
+          hits: 1,
+          bytes: 125,
+          lastHit: now,
+        },
+        {
+          index: 1,
+          type: 'FINAL',
+          policy: 'AI Suite',
+          displayKey: 'FINAL',
+          hits: 0,
+          bytes: 0,
+        },
+      ],
+      lists: [
+        {
+          name: 'Test.list',
+          path: expect.stringMatching(/Test\.list$/),
+          entries: 3,
+          matched: 2,
+        },
+      ],
+    });
+    expect(inventory.lists[0]!.matched).toBe(coverage.matched);
+    expect(response.body).not.toContain('password=');
+    expect(response.body).not.toContain('sni=');
+    expect(response.body).not.toContain('top-secret');
+    expect(response.body).not.toContain('secret.example');
+  });
+
+  it('returns an unavailable rules inventory when the Surge profile is missing', async () => {
+    writeFileSync(join(surgeListsDir, 'StillPresent.list'), 'DOMAIN,example.com\n');
+
+    const response = await app.inject({ method: 'GET', url: '/api/rules' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ available: false, groups: [], rules: [], lists: [] });
+  });
+
+  it('audits rule-list coverage against recent flows and historical host rollups', async () => {
+    const now = Date.now();
+    const historyTs = now - 30 * 24 * 60 * 60 * 1_000;
+    const historyBucket = Math.floor(historyTs / 3_600_000) * 3_600_000;
+    writeFileSync(
+      join(surgeListsDir, 'Coverage.list'),
+      'DOMAIN-SUFFIX,flow.example.com\nDOMAIN-SUFFIX,history.example\nDOMAIN,missing.example\n',
+    );
+    store.writeFlush({
+      flows: [
+        {
+          id: 'coverage-flow',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          host: 'api.flow.example.com',
+          bytesIn: 1,
+          bytesOut: 2,
+          state: 'active',
+        },
+      ],
+      rollups: [
+        {
+          ts: historyTs,
+          scope: 'host',
+          key: 'history.example',
+          bytesIn: 3,
+          bytesOut: 4,
+          flows: 1,
+        },
+      ],
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/rules/coverage/Coverage.list',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      name: 'Coverage.list',
+      total: 3,
+      matched: 2,
+      entries: [
+        {
+          value: 'flow.example.com',
+          type: 'DOMAIN-SUFFIX',
+          matched: true,
+          matchedVia: 'flows',
+          lastSeen: now,
+        },
+        {
+          value: 'history.example',
+          type: 'DOMAIN-SUFFIX',
+          matched: true,
+          matchedVia: 'history',
+          lastSeen: historyBucket,
+        },
+        { value: 'missing.example', type: 'DOMAIN', matched: false },
+      ],
+    });
+
+    const missing = await app.inject({ method: 'GET', url: '/api/rules/coverage/Unknown.list' });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ message: 'Rule list not found' });
+  });
+
+  it('searches the full domain catalog with literal LIKE characters and bounded limits', async () => {
+    const hour = 3_600_000;
+    const latest = Math.floor(Date.now() / hour) * hour;
+    const first = latest - hour;
+    store.writeFlush({
+      flows: [],
+      rollups: [
+        { ts: first, scope: 'host', key: 'api_foo.example', bytesIn: 10, bytesOut: 3 },
+        { ts: latest, scope: 'host', key: 'api_foo.example', bytesIn: 20, bytesOut: 2 },
+        { ts: latest, scope: 'host', key: 'xapi_foo.example', bytesIn: 700, bytesOut: 300 },
+        { ts: latest, scope: 'host', key: 'apiXfoo.example', bytesIn: 1_500, bytesOut: 500 },
+        { ts: latest, scope: 'host', key: 'alpha.example', bytesIn: 200, bytesOut: 100 },
+        { ts: latest, scope: 'wan', key: 'api_foo.example', bytesIn: 9_000, bytesOut: 9_000 },
+      ],
+    });
+
+    const search = await app.inject({
+      method: 'GET',
+      url: '/api/catalog/domains?q=API_foo&limit=2',
+    });
+    const limited = await app.inject({ method: 'GET', url: '/api/catalog/domains?limit=1' });
+    const overLimit = await app.inject({ method: 'GET', url: '/api/catalog/domains?limit=101' });
+
+    expect(search.statusCode).toBe(200);
+    expect(search.json<CatalogDomainDto[]>()).toEqual([
+      {
+        domain: 'api_foo.example',
+        firstSeen: first,
+        lastSeen: latest,
+        bytesIn: 30,
+        bytesOut: 5,
+      },
+      {
+        domain: 'xapi_foo.example',
+        firstSeen: latest,
+        lastSeen: latest,
+        bytesIn: 700,
+        bytesOut: 300,
+      },
+    ]);
+    expect(limited.statusCode).toBe(200);
+    expect(limited.json<CatalogDomainDto[]>()).toEqual([
+      {
+        domain: 'apiXfoo.example',
+        firstSeen: latest,
+        lastSeen: latest,
+        bytesIn: 1_500,
+        bytesOut: 500,
+      },
+    ]);
+    expect(overLimit.statusCode).toBe(400);
+  });
+
+  it('filters every breakdown path by exact raw policy', async () => {
+    const now = Date.now();
+    store.writeFlush({
+      flows: [
+        {
+          id: 'filtered-policy',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          host: 'api.example.com',
+          bytesIn: 100,
+          bytesOut: 20,
+          state: 'completed',
+          policy: '[oixCloud] HK Fusion 11',
+        },
+        {
+          id: 'other-policy',
+          sourceId: 'source-1',
+          deviceId: 'device-2',
+          ts: now,
+          host: 'cdn.example.com',
+          bytesIn: 1_000,
+          bytesOut: 200,
+          state: 'completed',
+          policy: 'DIRECT',
+        },
+      ],
+    });
+    const policy = encodeURIComponent('[oixCloud] HK Fusion 11');
+
+    const host = await app.inject({
+      method: 'GET',
+      url: `/api/breakdown?dim=host&minutes=5&policy=${policy}`,
+    });
+    const domain = await app.inject({
+      method: 'GET',
+      url: `/api/breakdown?dim=domain&minutes=5&policy=${policy}`,
+    });
+
+    expect(host.statusCode).toBe(200);
+    expect(host.json()).toMatchObject({
+      rows: [
+        {
+          key: 'api.example.com',
+          bytesIn: 100,
+          bytesOut: 20,
+          flows: 1,
+          devices: 1,
+        },
+      ],
+    });
+    expect(domain.statusCode).toBe(200);
+    expect(domain.json()).toMatchObject({
+      rows: [
+        { key: 'example.com', bytesIn: 100, bytesOut: 20, flows: 1, devices: 1 },
+      ],
     });
   });
 
@@ -1286,6 +1602,7 @@ describe('Hub API', () => {
       '/api/dns/summary?minutes=0',
       '/api/timeseries/multi?scope=device&minutes=1&limit=13',
       '/api/breakdown?dim=nope&minutes=1',
+      '/api/breakdown?dim=domain&minutes=1&policy=',
       '/api/sankey?minutes=0',
       '/api/chains?minutes=0',
       '/api/chains?minutes=1&limit=31',
@@ -1336,7 +1653,13 @@ describe('Hub API', () => {
     probes = new ProbeManager(store, pipeline, { adapters: { surge: fakeAdapter } });
     realtime = new Realtime(pipeline);
     app = await createApi({
-      config: { dataDir, consoleDist, faviconsEnabled: true },
+      config: {
+        dataDir,
+        consoleDist,
+        faviconsEnabled: true,
+        surgeProfilePath,
+        surgeListsDir,
+      },
       store,
       pipeline,
       probes,

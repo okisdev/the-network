@@ -14,7 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHART_SLOTS } from "@/lib/chart-colors";
 import { cn } from "@/lib/utils";
-import { formatRate, formatTime } from "@/lib/format";
+import { formatAxisTick, formatPointLabel, formatRate } from "@/lib/format";
 import { chartTooltipProps } from "./tooltip-style";
 import { useMounted } from "./use-mounted";
 
@@ -47,6 +47,7 @@ export function StackedAreaChart({
     }
     return [...rows.values()].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   }, [activeSeries]);
+  const spanMs = data.length > 1 ? Number(data[data.length - 1]?.ts ?? 0) - Number(data[0]?.ts ?? 0) : 0;
 
   if (data.length === 0) return null;
   if (!mounted) {
@@ -71,7 +72,7 @@ export function StackedAreaChart({
             dataKey="ts"
             minTickGap={48}
             tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
-            tickFormatter={(value) => formatTime(Number(value)).slice(0, 5)}
+            tickFormatter={(value) => formatAxisTick(Number(value), spanMs)}
             tickLine={false}
           />
           <YAxis
@@ -85,7 +86,7 @@ export function StackedAreaChart({
             {...chartTooltipProps}
             formatter={(value, name) => [formatRate(Number(value)), name]}
             itemSorter={(item) => -Number(item.value ?? 0)}
-            labelFormatter={(value) => formatTime(Number(value))}
+            labelFormatter={(value) => formatPointLabel(Number(value), spanMs)}
           />
           {activeSeries.map((entry, index) => {
             const color =

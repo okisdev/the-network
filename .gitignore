@@ -27,3 +27,4 @@ pnpm-debug.log*
 # OS and local tooling
 .DS_Store
 .claude/
+data/surge-profile.conf

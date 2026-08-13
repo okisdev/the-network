@@ -3,6 +3,7 @@ import type {
   BreakdownDim,
   BreakdownDto,
   BreakdownRow,
+  CatalogDomainDto,
   CityPoint,
   CountryDeviceShare,
   DailyPoint,
@@ -125,6 +126,25 @@ export interface RollupIncrement {
 export interface FlushBatch {
   flows: FlowWrite[];
   rollups?: RollupIncrement[];
+}
+
+export interface RulesAggregate {
+  key: string;
+  hits: number;
+  bytes: number;
+  lastHit: number;
+}
+
+export interface RulesObservation {
+  value: string;
+  lastSeen: number;
+}
+
+export interface RulesCoverageObservations {
+  hosts: RulesObservation[];
+  processes: RulesObservation[];
+  ips: RulesObservation[];
+  historyHosts: RulesObservation[];
 }
 
 export interface OverviewData {
@@ -1358,6 +1378,50 @@ export class Store {
     return this.listFlowPage(query);
   }
 
+  searchCatalogDomains(q: string | undefined, limit: number): CatalogDomainDto[] {
+    const boundedLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+    const filter = q?.replace(/[\\%_]/g, '\\$&');
+    const rows = (
+      filter === undefined
+        ? this.db
+            .prepare(
+              `SELECT key AS domain, MIN(bucket) AS first_seen, MAX(bucket) AS last_seen,
+                      SUM(bytes_in) AS bytes_in, SUM(bytes_out) AS bytes_out
+               FROM rollup_hour
+               WHERE scope = 'host'
+               GROUP BY key
+               ORDER BY SUM(bytes_in + bytes_out) DESC, key
+               LIMIT ?`,
+            )
+            .all(boundedLimit)
+        : this.db
+            .prepare(
+              `SELECT key AS domain, MIN(bucket) AS first_seen, MAX(bucket) AS last_seen,
+                      SUM(bytes_in) AS bytes_in, SUM(bytes_out) AS bytes_out
+               FROM rollup_hour
+               WHERE scope = 'host' AND key LIKE ? ESCAPE '\\'
+               GROUP BY key
+               ORDER BY CASE WHEN key LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END,
+                        SUM(bytes_in + bytes_out) DESC, key
+               LIMIT ?`,
+            )
+            .all(`%${filter}%`, `${filter}%`, boundedLimit)
+    ) as Array<{
+      domain: string;
+      first_seen: number;
+      last_seen: number;
+      bytes_in: number;
+      bytes_out: number;
+    }>;
+    return rows.map((row) => ({
+      domain: row.domain,
+      firstSeen: row.first_seen,
+      lastSeen: row.last_seen,
+      bytesIn: row.bytes_in,
+      bytesOut: row.bytes_out,
+    }));
+  }
+
   private listFlowPage(query: FlowsQuery & { host?: string }): FlowsPage {
     const limit = Math.min(200, Math.max(1, Math.floor(query.limit ?? 50)));
     const clauses: string[] = [];
@@ -1696,11 +1760,14 @@ export class Store {
     limit: number,
     now: number = this.now(),
     explicitWindow?: ExplicitWindow,
+    policy?: string,
   ): BreakdownDto {
     const window = retainedFlowWindow(minutes, now, explicitWindow);
     const deviceClause = deviceId === undefined ? '' : ' AND f.device_id = ?';
+    const policyClause = policy === undefined ? '' : ' AND f.policy = ?';
     const params: Array<string | number> = [window.from, window.to];
     if (deviceId !== undefined) params.push(deviceId);
+    if (policy !== undefined) params.push(policy);
 
     if (dim === 'domain') {
       const rows = this.db
@@ -1708,7 +1775,7 @@ export class Store {
           `SELECT f.host, f.device_id, MAX(f.country) AS country, SUM(f.bytes_in) AS bytes_in,
                   SUM(f.bytes_out) AS bytes_out, COUNT(*) AS flows, MIN(f.ts) AS first_ts
            FROM flows f
-           WHERE f.ts >= ? AND f.ts <= ? AND f.host IS NOT NULL${deviceClause}
+           WHERE f.ts >= ? AND f.ts <= ? AND f.host IS NOT NULL${deviceClause}${policyClause}
            GROUP BY f.host, f.device_id`,
         )
         .all(...params) as DomainSqlRow[];
@@ -1761,14 +1828,14 @@ export class Store {
       return { window, rows: output.slice(0, limit) };
     }
 
-    return { window, rows: this.flowBreakdownRows(dim, window, limit, { deviceId }) };
+    return { window, rows: this.flowBreakdownRows(dim, window, limit, { deviceId, policy }) };
   }
 
   private flowBreakdownRows(
     dim: Exclude<BreakdownDim, 'domain'> | 'device',
     window: { from: number; to: number },
     limit: number,
-    filters: { deviceId?: string; host?: string; omitNull?: boolean } = {},
+    filters: { deviceId?: string; host?: string; policy?: string; omitNull?: boolean } = {},
   ): BreakdownRow[] {
     const rawColumns: Record<Exclude<BreakdownDim, 'domain'> | 'device', string> = {
       device: 'f.device_id',
@@ -1806,6 +1873,10 @@ export class Store {
     if (filters.host !== undefined) {
       clauses.push("(f.host = ? OR f.host LIKE '%.' || ?)");
       params.push(filters.host, filters.host);
+    }
+    if (filters.policy !== undefined) {
+      clauses.push('f.policy = ?');
+      params.push(filters.policy);
     }
     if (dim === 'ip') clauses.push("(f.host IS NULL OR f.host = '')");
     if (filters.omitNull) {
@@ -2354,6 +2425,43 @@ export class Store {
       )
       .all(Math.max(0, Math.floor(limit))) as EventRow[];
     return rows.map(eventFromRow);
+  }
+
+  getRulesAggregates(since: number): RulesAggregate[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT rule AS key, COUNT(*) AS hits, SUM(bytes_in + bytes_out) AS bytes, MAX(ts) AS last_hit
+           FROM flows WHERE ts >= ? AND rule IS NOT NULL AND rule <> '' GROUP BY rule`,
+        )
+        .all(since) as Array<{ key: string; hits: number; bytes: number; last_hit: number }>
+    ).map((row) => ({ key: row.key, hits: row.hits, bytes: row.bytes, lastHit: row.last_hit }));
+  }
+
+  getRulesCoverageObservations(since: number): RulesCoverageObservations {
+    const readFlows = (column: 'host' | 'process' | 'ip'): RulesObservation[] =>
+      (
+        this.db
+          .prepare(
+            `SELECT ${column} AS value, MAX(ts) AS last_seen
+             FROM flows WHERE ts >= ? AND ${column} IS NOT NULL AND ${column} <> '' GROUP BY ${column}`,
+          )
+          .all(since) as Array<{ value: string; last_seen: number }>
+      ).map((row) => ({ value: row.value, lastSeen: row.last_seen }));
+    const historyHosts = (
+      this.db
+        .prepare(
+          `SELECT key AS value, MAX(bucket) AS last_seen
+           FROM rollup_hour WHERE scope = 'host' GROUP BY key`,
+        )
+        .all() as Array<{ value: string; last_seen: number }>
+    ).map((row) => ({ value: row.value, lastSeen: row.last_seen }));
+    return {
+      hosts: readFlows('host'),
+      processes: readFlows('process'),
+      ips: readFlows('ip'),
+      historyHosts,
+    };
   }
 
   getDatabaseInfo(): SystemDbDto {
