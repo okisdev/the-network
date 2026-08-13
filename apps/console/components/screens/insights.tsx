@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import type { BreakdownRow, MoverRow } from "@the-network/schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -91,8 +92,13 @@ function MoverCard({
                   <span className="block font-mono text-xs tabular-nums">
                     {formatBytes(row.current)}
                   </span>
-                  <span className="text-muted-foreground block font-mono text-xs tabular-nums">
-                    {rising ? "↑" : "↓"} {change}
+                  <span className="text-muted-foreground flex items-center justify-end gap-1 font-mono text-xs tabular-nums">
+                    {rising ? (
+                      <ArrowUp className="size-3 shrink-0" />
+                    ) : (
+                      <ArrowDown className="size-3 shrink-0" />
+                    )}
+                    {change}
                   </span>
                 </span>
               </Link>
@@ -106,7 +112,7 @@ function MoverCard({
 
 export function InsightsScreen() {
   const router = useRouter();
-  const { minutes } = useTimeRange();
+  const { minutes, rangeQuery } = useTimeRange();
   const { data: punchcard, isLoading: punchcardLoading } = useQuery({
     queryKey: ["insights", "punchcard", 28],
     queryFn: () => api.punchcard(28),
@@ -118,13 +124,13 @@ export function InsightsScreen() {
     refetchInterval: 30000,
   });
   const { data: movers, isLoading: moversLoading } = useQuery({
-    queryKey: ["insights", "movers", minutes],
-    queryFn: () => api.movers(minutes),
+    queryKey: ["insights", "movers", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.movers(rangeQuery),
     refetchInterval: 30000,
   });
   const { data: rejected, isLoading: rejectedLoading } = useQuery({
-    queryKey: ["rejected", minutes],
-    queryFn: () => api.rejected(minutes),
+    queryKey: ["rejected", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.rejected(rangeQuery),
     refetchInterval: 30000,
   });
   const { data: firstSeen, isLoading: firstSeenLoading } = useQuery({
@@ -133,8 +139,15 @@ export function InsightsScreen() {
     refetchInterval: 30000,
   });
   const { data: policySeries, isLoading: policySeriesLoading } = useQuery({
-    queryKey: ["timeseries-multi", "policy", minutes, 6],
-    queryFn: () => api.timeseriesMulti({ scope: "policy", minutes, limit: 6 }),
+    queryKey: [
+      "timeseries-multi",
+      "policy",
+      minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+      6,
+    ],
+    queryFn: () => api.timeseriesMulti({ scope: "policy", limit: 6, ...rangeQuery }),
     refetchInterval: 20000,
   });
 

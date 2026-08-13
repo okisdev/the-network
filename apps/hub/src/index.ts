@@ -4,6 +4,7 @@ import { loadConfig } from './config.ts';
 import { openDatabase } from './db.ts';
 import { Identity } from './identity.ts';
 import { logger, setLogSink } from './logger.ts';
+import { Notifier } from './notify.ts';
 import { Pipeline } from './pipeline.ts';
 import { ProbeManager } from './probes.ts';
 import { Realtime } from './realtime.ts';
@@ -17,10 +18,33 @@ export async function main(): Promise<void> {
   const identity = new Identity(store);
   const pipeline = new Pipeline(store, identity, {
     flushIntervalMs: config.flushIntervalMs,
+    asnDbPath: config.asnDbPath,
     logger,
   });
   const realtime = new Realtime(pipeline);
   const probes = new ProbeManager(store, pipeline, { logger });
+  const notifier = new Notifier(store, config);
+  const unsubscribeNotifier = pipeline.onEvent((event) => {
+    switch (event.kind) {
+      case 'device_joined': {
+        const deviceName =
+          event.deviceId === undefined ? undefined : store.getDeviceById(event.deviceId)?.name;
+        notifier.send(
+          event.kind,
+          'New device joined',
+          deviceName ?? event.message,
+          event.deviceId ?? event.id,
+        );
+        break;
+      }
+      case 'source_error':
+        notifier.send(event.kind, 'Probe error', event.message, event.sourceId ?? event.id);
+        break;
+      case 'source_recovered':
+        notifier.send(event.kind, 'Probe recovered', event.message, event.sourceId ?? event.id);
+        break;
+    }
+  });
   const app = await createApi({ config, store, pipeline, probes, realtime });
   probes.startEnabled();
 
@@ -32,6 +56,36 @@ export async function main(): Promise<void> {
     }
   }, 60 * 60 * 1_000);
   retentionTimer.unref();
+
+  const healthTimer = setInterval(() => {
+    try {
+      probes.sampleHealth();
+    } catch (error) {
+      logger.error(`Source health sampling failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, 60_000);
+  healthTimer.unref();
+
+  const rejectedTimer =
+    config.notifyWebhookUrl === undefined && config.notifyBarkUrl === undefined
+      ? undefined
+      : setInterval(() => {
+          try {
+            const now = Date.now();
+            const count = store.countRejectedFlows(now - 5 * 60_000, now);
+            if (count >= config.notifyRejectedThreshold) {
+              notifier.send(
+                'rejected_spike',
+                'Rejected flow spike',
+                `${count} rejected flows in the last 5 minutes`,
+                'all',
+              );
+            }
+          } catch (error) {
+            logger.error(`Rejected flow check failed: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }, 5 * 60_000);
+  rejectedTimer?.unref();
 
   let closing = false;
   const shutdown = async (): Promise<void> => {
@@ -45,6 +99,9 @@ export async function main(): Promise<void> {
       logger.error(`Final pipeline flush failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     clearInterval(retentionTimer);
+    clearInterval(healthTimer);
+    if (rejectedTimer !== undefined) clearInterval(rejectedTimer);
+    unsubscribeNotifier();
     realtime.close();
     await app.close();
     setLogSink();

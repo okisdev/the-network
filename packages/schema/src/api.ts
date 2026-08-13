@@ -53,6 +53,9 @@ export interface FlowDto {
   proxied?: boolean;
   connectMs?: number;
   city?: string;
+  asn?: number;
+  asOrg?: string;
+  rdns?: string;
   startedAt?: number;
   endedAt?: number;
 }
@@ -180,6 +183,25 @@ export type TimeseriesScope =
 export interface TimeseriesQuery {
   scope: TimeseriesScope;
   minutes: number;
+  from?: number;
+  to?: number;
+}
+
+export interface AuthStatusDto {
+  enabled: boolean;
+  authenticated: boolean;
+}
+
+export interface SourceHealthPoint {
+  ts: number;
+  ok: boolean;
+  latencyMs?: number;
+}
+
+export interface SystemDbDto {
+  sizeBytes: number;
+  tables: Array<{ name: string; rows: number }>;
+  retention: Array<{ table: string; days: number }>;
 }
 
 export interface MultiSeriesDto {
@@ -196,11 +218,14 @@ export type BreakdownDim =
   | 'policy'
   | 'country'
   | 'host'
-  | 'domain';
+  | 'domain'
+  | 'ip'
+  | 'asn';
 
 export interface BreakdownRow {
   key: string;
   label?: string;
+  country?: string;
   bytesIn: number;
   bytesOut: number;
   flows: number;

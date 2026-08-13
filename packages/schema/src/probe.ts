@@ -20,6 +20,7 @@ export interface ProbeStatus {
   state: ProbeState;
   message?: string;
   lastSuccessAt?: number;
+  lastLatencyMs?: number;
 }
 
 export interface ProbeDescriptor {

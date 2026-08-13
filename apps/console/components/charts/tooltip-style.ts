@@ -1,4 +1,5 @@
 export const chartTooltipProps = {
+  wrapperStyle: { zIndex: 30, outline: "none" },
   contentStyle: {
     background: "var(--color-popover)",
     border: "none",

@@ -4,6 +4,7 @@ import {
   ArrowRightLeft,
   Globe,
   LayoutDashboard,
+  LogOut,
   type LucideIcon,
   MonitorSmartphone,
   PlugZap,
@@ -12,6 +13,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/auth-provider";
 import { cn } from "@/lib/utils";
 
 const MONITOR_ITEMS: Array<{ href: string; label: string; icon: LucideIcon }> = [
@@ -55,6 +58,8 @@ function NavItem({ href, label, icon: Icon }: { href: string; label: string; ico
 }
 
 export function Sidebar() {
+  const { enabled, logout } = useAuth();
+
   return (
     <aside className="border-border bg-background fixed inset-y-0 left-0 flex w-52 flex-col border-r">
       <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
@@ -77,8 +82,14 @@ export function Sidebar() {
           <NavItem key={item.href} {...item} />
         ))}
       </nav>
-      <footer className="border-border text-muted-foreground border-t px-4 py-3 text-xs">
-        M0 · self hosted
+      <footer className="border-border text-muted-foreground flex items-center justify-between border-t px-4 py-3 text-xs">
+        <span>M0 · self hosted</span>
+        {enabled && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => void logout()}>
+            <LogOut className="size-3.5" />
+            Sign out
+          </Button>
+        )}
       </footer>
     </aside>
   );

@@ -22,7 +22,7 @@ export function TabsTab({ className, ...props }: ComponentProps<typeof TabsPrimi
     <TabsPrimitive.Tab
       data-slot="tabs-tab"
       className={cn(
-        "text-muted-foreground hover:text-foreground data-[selected]:bg-card data-[selected]:ring-border data-[selected]:text-foreground rounded px-2.5 py-1 text-xs font-medium transition-colors duration-150 outline-none select-none data-[selected]:ring-1",
+        "text-muted-foreground hover:text-foreground aria-selected:bg-card aria-selected:ring-border aria-selected:text-foreground aria-selected:shadow-sm rounded px-2.5 py-1 text-xs font-medium transition-colors duration-150 outline-none select-none aria-selected:ring-1",
         className,
       )}
       {...props}

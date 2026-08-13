@@ -79,3 +79,21 @@ Every file states why it exists and which policy it expects at the reference sit
 ### Consumer
 
 The gateway profile is rendered by the panel worker and delivered as a managed Surge configuration. Rules from this repository are referenced by URL, so a change here reaches every device on the next profile refresh without a redeploy.
+
+## Configuration
+
+The hub reads these environment variables at startup.
+
+| Variable | Effect | Default |
+| --- | --- | --- |
+| `TN_PORT` | Sets the hub HTTP port. | `9420` |
+| `TN_DATA_DIR` | Sets the directory for the SQLite database, favicon cache, and offline data. | `./data` |
+| `TN_CONSOLE_DIST` | Sets the static console export directory served by the hub. | `apps/console/out` |
+| `TN_AUTH_TOKEN` | Requires the token for hub API sessions and bearer authentication when set. | Unset, which disables authentication. |
+| `TN_ASN_DB` | Sets the path to the offline IP to ASN database. | `<TN_DATA_DIR>/ip2asn-combined.tsv` |
+| `TN_NOTIFY_WEBHOOK` | Sends notification payloads as JSON POST requests to this URL. | Unset, which disables webhook delivery. |
+| `TN_NOTIFY_BARK` | Sends notifications through this Bark base URL, such as `https://api.day.app/KEY`. | Unset, which disables Bark delivery. |
+| `TN_NOTIFY_REJECTED_THRESHOLD` | Sets the rejected flow count that triggers a five minute spike notification. | `50` |
+| `TN_FAVICONS` | Set to `off` to disable the cached favicon proxy. | Enabled. |
+
+Run `scripts/update-asn.mjs` to fetch the offline ASN database into the configured data directory.

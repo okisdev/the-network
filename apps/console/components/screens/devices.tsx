@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { DeviceDto } from "@the-network/schema";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { PresenceRibbon } from "@/components/charts/presence-ribbon";
 import { SplitBar } from "@/components/charts/split-bar";
 import { TopologyGraph } from "@/components/charts/topology";
+import { ArrowLink } from "@/components/ui/arrow-link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -327,7 +329,7 @@ function DevicesList({
               {devices.map((device) => {
                 const firstIp = device.ips[0];
                 const extra = Math.max(0, device.ips.length - 1);
-                const DeviceIcon = deviceIcon(device.iconId);
+                const DeviceIcon = deviceIcon(device.iconId, device.name);
                 return (
                   <TableRow
                     key={device.id}
@@ -420,10 +422,10 @@ function DeviceInspector({
 }) {
   const router = useRouter();
   const live = useLive();
-  const { minutes, range } = useTimeRange();
+  const { minutes, rangeQuery, label, isCustom } = useTimeRange();
   const { data: detail, error, isLoading } = useQuery({
-    queryKey: ["device-detail", deviceId, minutes],
-    queryFn: () => api.deviceDetail(deviceId, minutes),
+    queryKey: ["device-detail", deviceId, minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.deviceDetail(deviceId, rangeQuery),
     refetchInterval: 15000,
     retry: (failureCount, queryError) =>
       !(queryError instanceof ApiError && queryError.status === 404) && failureCount < 3,
@@ -432,7 +434,8 @@ function DeviceInspector({
   const liveRate = live.deviceRates.get(deviceId);
   const rateIn = liveRate?.rateIn ?? device?.rateIn ?? 0;
   const rateOut = liveRate?.rateOut ?? device?.rateOut ?? 0;
-  const now = Date.now();
+  const rangeTo = rangeQuery.to ?? Date.now();
+  const rangeFrom = rangeQuery.from ?? rangeTo - minutes * 60000;
   const sub = [!isHiddenMac(device?.mac) ? device?.mac : undefined, device?.vendor]
     .filter(Boolean)
     .join(" · ");
@@ -498,14 +501,18 @@ function DeviceInspector({
                 label="Down"
                 value={<span className="font-mono text-base">{formatRate(rateIn)}</span>}
                 sub={
-                  <span className="font-mono tabular-nums">Today ↓ {formatBytes(device.todayIn)}</span>
+                  <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                    Today <ArrowDown className="size-3 shrink-0" /> {formatBytes(device.todayIn)}
+                  </span>
                 }
               />
               <Stat
                 label="Up"
                 value={<span className="font-mono text-base">{formatRate(rateOut)}</span>}
                 sub={
-                  <span className="font-mono tabular-nums">Today ↑ {formatBytes(device.todayOut)}</span>
+                  <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                    Today <ArrowUp className="size-3 shrink-0" /> {formatBytes(device.todayOut)}
+                  </span>
                 }
               />
             </div>
@@ -522,12 +529,12 @@ function DeviceInspector({
           <InspectorSection title="Presence">
             <PresenceRibbon
               intervals={detail.presence}
-              from={now - minutes * 60000}
-              to={now}
+              from={rangeFrom}
+              to={rangeTo}
             />
             {detail.presence.length === 0 && <div className="bg-muted h-1.5 rounded-full" />}
             <p className="text-muted-foreground mt-2 text-[11px]">
-              online periods · last {range}
+              online periods · {isCustom ? label : `last ${label}`}
             </p>
           </InspectorSection>
 
@@ -639,7 +646,10 @@ function DeviceInspector({
             )}
           </InspectorSection>
 
-          <InspectorSection title="Recent flows">
+          <InspectorSection
+            title="Recent flows"
+            action={<ArrowLink href={flowsHref(deviceId)}>All flows</ArrowLink>}
+          >
             {detail.recentFlows.length > 0 ? (
               <div className="divide-border divide-y">
                 {detail.recentFlows.slice(0, 10).map((flow) => (
@@ -659,12 +669,6 @@ function DeviceInspector({
             ) : (
               <InspectorEmpty message="No recent flows" />
             )}
-            <Link
-              className="text-muted-foreground hover:text-foreground mt-2 inline-flex text-xs"
-              href={flowsHref(deviceId)}
-            >
-              All flows →
-            </Link>
           </InspectorSection>
         </>
       )}

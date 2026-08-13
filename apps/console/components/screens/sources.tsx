@@ -1,9 +1,16 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SourceDto, SourceInput, TestConnectionResult } from "@the-network/schema";
+import type {
+  SourceDto,
+  SourceHealthPoint,
+  SourceInput,
+  TestConnectionResult,
+} from "@the-network/schema";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PresenceRibbon } from "@/components/charts/presence-ribbon";
+import { Sparkline } from "@/components/charts/sparkline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,9 +23,12 @@ import {
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot } from "@/components/ui/status-dot";
-import { ApiError, api } from "@/lib/api";
-import { formatTimeAgo } from "@/lib/format";
+import { useTimeRange } from "@/contexts/timerange-provider";
+import { ApiError, api, type RangeQuery } from "@/lib/api";
+import { formatBytes, formatTimeAgo } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 interface SourceForm {
   name: string;
@@ -107,8 +117,174 @@ function sourceErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Request failed";
 }
 
+function median(values: number[]): number | undefined {
+  if (values.length === 0) return undefined;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1]! + sorted[middle]!) / 2
+    : sorted[middle]!;
+}
+
+function healthIntervals(points: SourceHealthPoint[]): Array<{ start: number; end: number }> {
+  const sorted = [...points].sort((a, b) => a.ts - b.ts);
+  const gaps: number[] = [];
+  for (let index = 1; index < sorted.length; index += 1) {
+    const gap = sorted[index]!.ts - sorted[index - 1]!.ts;
+    if (gap > 0) gaps.push(gap);
+  }
+  gaps.sort((a, b) => a - b);
+  const expectedGap = gaps[Math.floor((gaps.length - 1) / 2)] ?? Number.POSITIVE_INFINITY;
+  const intervals: Array<{ start: number; end: number }> = [];
+  let start: number | undefined;
+  let end: number | undefined;
+  let previousTs: number | undefined;
+
+  for (const point of sorted) {
+    const hasGap = previousTs !== undefined && point.ts - previousTs > expectedGap * 2;
+    if ((!point.ok || hasGap) && start !== undefined && end !== undefined) {
+      intervals.push({ start, end });
+      start = undefined;
+      end = undefined;
+    }
+    if (point.ok) {
+      start ??= point.ts;
+      end = point.ts;
+    }
+    previousTs = point.ts;
+  }
+
+  if (start !== undefined && end !== undefined) intervals.push({ start, end });
+  return intervals;
+}
+
+function SourceHealthStrip({
+  sourceId,
+  rangeQuery,
+  rangeLabel,
+}: {
+  sourceId: string;
+  rangeQuery: RangeQuery;
+  rangeLabel: string;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: [
+      "sourceHealth",
+      sourceId,
+      rangeQuery.minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+    ],
+    queryFn: () => api.sourceHealth(sourceId, rangeQuery),
+    refetchInterval: 30000,
+  });
+  const points = Array.isArray(data) ? data : [];
+
+  if (isLoading && !data) return <Skeleton className="mt-4 h-14 w-full" />;
+  if (points.length === 0) {
+    return <p className="mt-4 text-xs text-muted-foreground">No health history yet</p>;
+  }
+
+  const uptime = (points.filter((point) => point.ok).length / points.length) * 100;
+  const latencies = points
+    .map((point) => point.latencyMs)
+    .filter((latency): latency is number => latency !== undefined);
+  const latencyMedian = median(latencies);
+  const intervals = healthIntervals(points);
+  const to = rangeQuery.to ?? Date.now();
+  const from = rangeQuery.from ?? to - rangeQuery.minutes * 60000;
+
+  return (
+    <div className="mt-4 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_minmax(180px,1fr)] sm:items-end">
+      <div>
+        <p
+          className={cn(
+            "font-mono text-lg tabular-nums",
+            uptime >= 99 ? "text-ok" : uptime >= 95 ? "text-warn" : "text-destructive",
+          )}
+        >
+          {uptime.toFixed(uptime === 100 ? 0 : 1)}%
+        </p>
+        <p className="text-[11px] text-muted-foreground">uptime · {rangeLabel}</p>
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
+          <span>latency</span>
+          <span className="font-mono tabular-nums">
+            {latencyMedian === undefined ? "—" : `${Math.round(latencyMedian)} ms`}
+          </span>
+        </div>
+        <Sparkline
+          className="mt-1"
+          points={latencies}
+          stroke="var(--color-chart-2)"
+        />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground">availability</p>
+        {intervals.length > 0 ? (
+          <PresenceRibbon className="mt-2" intervals={intervals} from={from} to={to} />
+        ) : (
+          <div className="mt-2 h-1.5 rounded-full bg-muted" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SystemCard() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["systemDb"],
+    queryFn: api.systemDb,
+    refetchInterval: 60000,
+  });
+  const tables = [...(data?.tables ?? [])].sort((a, b) => b.rows - a.rows).slice(0, 6);
+
+  return (
+    <Card title="System" className="mt-3">
+      {isLoading && !data ? (
+        <Skeleton className="h-24 w-full" />
+      ) : isError || !data ? (
+        <Empty message="Database info is not available yet" />
+      ) : (
+        <div className="grid gap-8 sm:grid-cols-[auto_1fr_1fr]">
+          <div>
+            <p className="text-xs text-muted-foreground">Database</p>
+            <p className="mt-1 font-mono text-2xl tabular-nums">{formatBytes(data.sizeBytes)}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="mb-2 text-xs text-muted-foreground">Tables</p>
+            {tables.length > 0 ? (
+              <div className="space-y-1">
+                {tables.map((table) => (
+                  <p key={table.name} className="truncate font-mono text-xs tabular-nums">
+                    {table.name} · {table.rows.toLocaleString()} rows
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No table data</p>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="mb-2 text-xs text-muted-foreground">Retention</p>
+            {data.retention.length > 0 ? (
+              <p className="font-mono text-xs text-muted-foreground tabular-nums">
+                {data.retention.map((entry) => `${entry.table} ${entry.days}d`).join(" · ")}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">No retention policies</p>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function SourcesScreen() {
   const queryClient = useQueryClient();
+  const { rangeQuery, label: rangeLabel } = useTimeRange();
   const { data: sources, isLoading } = useQuery({
     queryKey: ["sources"],
     queryFn: api.sources,
@@ -279,11 +455,18 @@ export function SourcesScreen() {
                     </Button>
                   </div>
                 </div>
+                <SourceHealthStrip
+                  sourceId={source.id}
+                  rangeQuery={rangeQuery}
+                  rangeLabel={rangeLabel}
+                />
               </Card>
             );
           })}
         </div>
       )}
+
+      <SystemCard />
 
       <Dialog
         open={dialogSource !== undefined}

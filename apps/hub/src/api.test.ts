@@ -8,12 +8,16 @@ import type {
   FlowsPage,
   HostDetailDto,
   ProbeAdapter,
+  SankeyDto,
+  SourceHealthPoint,
   SourceDto,
+  SystemDbDto,
 } from '@the-network/schema';
 import type Database from 'better-sqlite3';
 import type { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApi } from './api.ts';
+import { loadConfig } from './config.ts';
 import { openDatabase } from './db.ts';
 import { Identity } from './identity.ts';
 import { Pipeline } from './pipeline.ts';
@@ -28,7 +32,7 @@ const fakeAdapter: ProbeAdapter = {
     capabilities: ['per_device', 'whole_home'],
   },
   async start(ctx) {
-    ctx.setStatus({ state: 'ok' });
+    ctx.setStatus({ state: 'ok', lastLatencyMs: 23 });
     await new Promise<void>((resolve) => ctx.signal.addEventListener('abort', () => resolve(), { once: true }));
   },
   async testConnection() {
@@ -56,17 +60,41 @@ describe('Hub API', () => {
         if (ip === '1.1.1.1') return 'AU';
         return undefined;
       },
+      rdnsLookup: async () => undefined,
     });
     probes = new ProbeManager(store, pipeline, { adapters: { surge: fakeAdapter } });
     realtime = new Realtime(pipeline);
     app = await createApi({
-      config: { consoleDist: join(dataDir, 'missing-console') },
+      config: {
+        dataDir,
+        consoleDist: join(dataDir, 'missing-console'),
+        faviconsEnabled: true,
+      },
       store,
       pipeline,
       probes,
       realtime,
     });
   });
+
+  async function recreateApp(
+    options: { authToken?: string; faviconsEnabled?: boolean; fetch?: typeof fetch } = {},
+  ): Promise<void> {
+    await app.close();
+    app = await createApi({
+      config: {
+        dataDir,
+        consoleDist: join(dataDir, 'missing-console'),
+        faviconsEnabled: options.faviconsEnabled ?? true,
+        ...(options.authToken === undefined ? {} : { authToken: options.authToken }),
+      },
+      store,
+      pipeline,
+      probes,
+      realtime,
+      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+    });
+  }
 
   afterEach(async () => {
     probes.stopAll();
@@ -75,6 +103,190 @@ describe('Hub API', () => {
     await app.close();
     db.close();
     rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('loads optional authentication tokens from trimmed environment values', () => {
+    expect(loadConfig({ TN_DATA_DIR: dataDir, TN_AUTH_TOKEN: '  shared secret  ' }, dataDir)).toMatchObject({
+      authToken: 'shared secret',
+      asnDbPath: join(dataDir, 'ip2asn-combined.tsv'),
+    });
+    expect(loadConfig({ TN_DATA_DIR: dataDir, TN_AUTH_TOKEN: '   ' }, dataDir).authToken).toBeUndefined();
+    expect(loadConfig({ TN_DATA_DIR: dataDir, TN_ASN_DB: 'asn.tsv' }, dataDir).asnDbPath).toBe(
+      join(dataDir, 'asn.tsv'),
+    );
+    expect(
+      loadConfig(
+        {
+          TN_DATA_DIR: dataDir,
+          TN_NOTIFY_WEBHOOK: ' https://notify.example/hook ',
+          TN_NOTIFY_BARK: ' https://api.day.app/key ',
+          TN_NOTIFY_REJECTED_THRESHOLD: '75',
+          TN_FAVICONS: 'off',
+        },
+        dataDir,
+      ),
+    ).toMatchObject({
+      notifyWebhookUrl: 'https://notify.example/hook',
+      notifyBarkUrl: 'https://api.day.app/key',
+      notifyRejectedThreshold: 75,
+      faviconsEnabled: false,
+    });
+    expect(loadConfig({ TN_DATA_DIR: dataDir }, dataDir)).toMatchObject({
+      notifyRejectedThreshold: 50,
+      faviconsEnabled: true,
+    });
+    expect(() =>
+      loadConfig({ TN_DATA_DIR: dataDir, TN_NOTIFY_REJECTED_THRESHOLD: '1.5' }, dataDir),
+    ).toThrow('TN_NOTIFY_REJECTED_THRESHOLD must be a positive integer');
+  });
+
+  it('proxies favicons and reuses fresh cached files', async () => {
+    const icon = Buffer.from([0, 1, 2, 3]);
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      new Response(icon, { status: 200, headers: { 'content-type': 'image/png' } }));
+    await recreateApp({ fetch: fetchMock as typeof fetch });
+
+    const first = await app.inject({ method: 'GET', url: '/api/favicon/Example.com' });
+    const second = await app.inject({ method: 'GET', url: '/api/favicon/example.com' });
+
+    expect(first.statusCode).toBe(200);
+    expect(first.headers['content-type']).toBe('image/x-icon');
+    expect(first.headers['cache-control']).toBe('public,max-age=86400');
+    expect(first.rawPayload).toEqual(icon);
+    expect(second.statusCode).toBe(200);
+    expect(second.rawPayload).toEqual(icon);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://icons.duckduckgo.com/ip3/example.com.ico',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('negative-caches favicon failures', async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      new Response('missing', { status: 404, headers: { 'content-type': 'text/plain' } }));
+    await recreateApp({ fetch: fetchMock as typeof fetch });
+
+    const first = await app.inject({ method: 'GET', url: '/api/favicon/missing.example' });
+    const second = await app.inject({ method: 'GET', url: '/api/favicon/missing.example' });
+
+    expect(first.statusCode).toBe(404);
+    expect(second.statusCode).toBe(404);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('rejects invalid favicon domains before fetching', async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      new Response(null, { status: 200, headers: { 'content-type': 'image/png' } }));
+    await recreateApp({ fetch: fetchMock as typeof fetch });
+
+    const response = await app.inject({ method: 'GET', url: '/api/favicon/bad_domain' });
+
+    expect(response.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the favicon endpoint disabled when configured off', async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      new Response(null, { status: 200, headers: { 'content-type': 'image/png' } }));
+    await recreateApp({ faviconsEnabled: false, fetch: fetchMock as typeof fetch });
+
+    const response = await app.inject({ method: 'GET', url: '/api/favicon/example.com' });
+
+    expect(response.statusCode).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps authentication disabled when no token is configured', async () => {
+    const status = await app.inject({ method: 'GET', url: '/api/auth/status' });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toEqual({ enabled: false, authenticated: false });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { token: 'anything' },
+    });
+    expect(login.statusCode).toBe(200);
+    expect(login.json()).toEqual({ enabled: false, authenticated: true });
+    expect((await app.inject({ method: 'GET', url: '/api/overview' })).statusCode).toBe(200);
+  });
+
+  it('authenticates API requests with sessions or bearer tokens and clears sessions', async () => {
+    await recreateApp({ authToken: 'correct horse' });
+
+    const status = await app.inject({ method: 'GET', url: '/api/auth/status' });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toEqual({ enabled: true, authenticated: false });
+    expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/overview' })).json()).toEqual({
+      message: 'Unauthorized',
+    });
+    expect((await app.inject({ method: 'GET', url: '/api/stream' })).statusCode).toBe(401);
+
+    const invalidLogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { token: 'wrong horse' },
+    });
+    expect(invalidLogin.statusCode).toBe(401);
+    expect(invalidLogin.json()).toEqual({ message: 'Invalid token' });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { token: 'correct horse' },
+    });
+    expect(login.statusCode).toBe(200);
+    expect(login.json()).toEqual({ enabled: true, authenticated: true });
+    const setCookieHeader = login.headers['set-cookie'];
+    const setCookie = Array.isArray(setCookieHeader) ? setCookieHeader[0] : setCookieHeader;
+    expect(setCookie).toContain('tn_session=');
+    expect(setCookie).toContain('HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000');
+    const cookie = setCookie!.split(';', 1)[0]!;
+
+    const cookieStatus = await app.inject({
+      method: 'GET',
+      url: '/api/auth/status',
+      headers: { cookie },
+    });
+    expect(cookieStatus.json()).toEqual({ enabled: true, authenticated: true });
+    expect(
+      (await app.inject({ method: 'GET', url: '/api/overview', headers: { cookie } })).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/api/overview',
+          headers: { authorization: 'Bearer correct horse' },
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    for (const invalidCookie of [
+      `tn_session=${Date.now() - 1}.` + '0'.repeat(64),
+      `tn_session=${Date.now() + 60_000}.` + '0'.repeat(64),
+    ]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/overview',
+        headers: { cookie: invalidCookie },
+      });
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toEqual({ message: 'Unauthorized' });
+    }
+
+    const logout = await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { cookie },
+    });
+    expect(logout.statusCode).toBe(200);
+    expect(logout.json()).toEqual({ ok: true });
+    expect(logout.headers['set-cookie']).toBe(
+      'tn_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0',
+    );
   });
 
   it('roundtrips sources and redacts api keys', async () => {
@@ -117,6 +329,69 @@ describe('Hub API', () => {
     const deleted = await app.inject({ method: 'DELETE', url: `/api/sources/${created.id}` });
     expect(deleted.json()).toEqual({ ok: true });
     expect((await app.inject({ method: 'GET', url: '/api/sources' })).json()).toEqual([]);
+  });
+
+  it('samples and returns source health within explicit ranges', async () => {
+    const now = Date.now();
+    const source = store.createSource({
+      id: 'source-health',
+      kind: 'surge',
+      name: 'Gateway',
+      enabled: true,
+      settingsJson: JSON.stringify({ url: 'http://gateway.local', apiKey: 'secret' }),
+      createdAt: now,
+    });
+    probes.start(source.id);
+    await vi.waitFor(() => expect(probes.getStatus(source.id).state).toBe('ok'));
+    store.appendSourceHealth(source.id, now - 60_000, false);
+    probes.sampleHealth(now - 30_000);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/sources/${source.id}/health?minutes=1&from=${now - 60_000}&to=${now}`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<SourceHealthPoint[]>()).toEqual([
+      { ts: now - 60_000, ok: false },
+      { ts: now - 30_000, ok: true, latencyMs: 23 },
+    ]);
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: `/api/sources/missing/health?minutes=1&from=${now - 60_000}&to=${now}`,
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ message: 'Source not found' });
+  });
+
+  it('returns database size, table counts, and retention policy', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/system/db' });
+    expect(response.statusCode).toBe(200);
+    const info = response.json<SystemDbDto>();
+    expect(info.sizeBytes).toBeGreaterThan(0);
+    expect(info.tables).toEqual(
+      [
+        'flows',
+        'rollup_minute',
+        'rollup_hour',
+        'dns_log',
+        'system_log',
+        'events',
+        'presence_log',
+        'source_health',
+        'devices',
+        'device_ips',
+      ].map((name) => ({ name, rows: 0 })),
+    );
+    expect(info.retention).toEqual([
+      { table: 'flows', days: 14 },
+      { table: 'rollup_minute', days: 2 },
+      { table: 'rollup_hour', days: 396 },
+      { table: 'dns_log', days: 7 },
+      { table: 'system_log', days: 7 },
+      { table: 'events', days: 90 },
+      { table: 'source_health', days: 30 },
+    ]);
   });
 
   it('returns the overview contract after fake events', async () => {
@@ -412,10 +687,10 @@ describe('Hub API', () => {
       { key: 'US', bytesIn: 120, bytesOut: 30, flows: 1 },
     ]);
     expect(detail.topProcesses).toEqual([
-      { key: 'Browser', bytesIn: 120, bytesOut: 30, flows: 1, devices: 1 },
+      { key: 'Browser', country: 'US', bytesIn: 120, bytesOut: 30, flows: 1, devices: 1 },
     ]);
     expect(detail.topPorts).toEqual([
-      { key: '443', bytesIn: 120, bytesOut: 30, flows: 1, devices: 1 },
+      { key: '443', country: 'US', bytesIn: 120, bytesOut: 30, flows: 1, devices: 1 },
     ]);
     expect(detail.policySplit).toEqual([{ policy: 'Proxy', bytes: 150 }]);
     expect(detail.presence).toEqual([{ start: now - 120_000, end: now - 60_000 }]);
@@ -761,6 +1036,19 @@ describe('Hub API', () => {
     expect(points).toHaveLength(7);
     expect(points.every((point) => point.in === 0 && point.out === 0)).toBe(true);
     expect(points[1]!.ts - points[0]!.ts).toBe(60_000);
+
+    const to = Math.floor(Date.now() / 60_000) * 60_000;
+    const from = to - 2 * 60_000;
+    const explicit = await app.inject({
+      method: 'GET',
+      url: `/api/timeseries?scope=wan&minutes=1&from=${from}&to=${to}`,
+    });
+    expect(explicit.statusCode).toBe(200);
+    expect(explicit.json()).toEqual([
+      { ts: from, in: 0, out: 0 },
+      { ts: from + 60_000, in: 0, out: 0 },
+      { ts: to, in: 0, out: 0 },
+    ]);
   });
 
   it('serves every aggregate read endpoint with ranked and zero-filled data', async () => {
@@ -943,6 +1231,49 @@ describe('Hub API', () => {
     expect(rejected.topRules.map((row) => row.key)).toEqual(['Rule A', 'Rule B']);
   });
 
+  it('returns ranked observed decision chains', async () => {
+    const now = Date.now();
+    store.writeFlush({
+      flows: [
+        {
+          id: 'chain-api-1',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now,
+          bytesIn: 100,
+          bytesOut: 20,
+          state: 'completed',
+          policyChain: ['Rules', 'Proxy', 'Singapore'],
+        },
+        {
+          id: 'chain-api-2',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: now - 1,
+          bytesIn: 50,
+          bytesOut: 0,
+          state: 'completed',
+          policyChain: ['Rules', 'Direct'],
+        },
+      ],
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/api/chains?minutes=5&limit=1' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<SankeyDto>()).toEqual({
+      nodes: [
+        { id: 'policy:key:Rules', label: 'Rules', kind: 'policy' },
+        { id: 'policy:key:Proxy', label: 'Proxy', kind: 'policy' },
+        { id: 'policy:key:Singapore', label: 'Singapore', kind: 'policy' },
+      ],
+      links: [
+        { source: 0, target: 1, bytes: 120 },
+        { source: 1, target: 2, bytes: 120 },
+      ],
+    });
+  });
+
   it('validates aggregate read query limits and windows', async () => {
     const urls = [
       '/api/flows?proto=icmp',
@@ -956,11 +1287,25 @@ describe('Hub API', () => {
       '/api/timeseries/multi?scope=device&minutes=1&limit=13',
       '/api/breakdown?dim=nope&minutes=1',
       '/api/sankey?minutes=0',
+      '/api/chains?minutes=0',
+      '/api/chains?minutes=1&limit=31',
+      '/api/chains?minutes=1&from=2&to=1',
       '/api/insights/punchcard?days=91',
       '/api/insights/daily?days=61',
       '/api/insights/movers?minutes=525601',
       '/api/insights/firstseen?days=31',
       '/api/insights/rejected?minutes=0',
+      '/api/timeseries?scope=wan&minutes=1&from=2&to=1',
+      '/api/timeseries?scope=wan&minutes=1&from=1',
+      '/api/timeseries/multi?scope=device&minutes=1&from=2&to=1',
+      '/api/breakdown?dim=domain&minutes=1&from=2&to=1',
+      '/api/sankey?minutes=1&from=2&to=1',
+      '/api/insights/rejected?minutes=1&from=2&to=1',
+      '/api/insights/movers?minutes=1&from=2&to=1',
+      '/api/dns/summary?minutes=1&from=2&to=1',
+      '/api/destinations/cities?minutes=1&from=2&to=1',
+      '/api/devices/device-1/detail?minutes=1&from=2&to=1',
+      '/api/hosts/example.com?minutes=1&from=2&to=1',
     ];
     for (const url of urls) {
       const response = await app.inject({ method: 'GET', url });
@@ -984,11 +1329,14 @@ describe('Hub API', () => {
 
     db = openDatabase(dataDir);
     store = new Store(db);
-    pipeline = new Pipeline(store, new Identity(store), { autoStart: false });
+    pipeline = new Pipeline(store, new Identity(store), {
+      autoStart: false,
+      rdnsLookup: async () => undefined,
+    });
     probes = new ProbeManager(store, pipeline, { adapters: { surge: fakeAdapter } });
     realtime = new Realtime(pipeline);
     app = await createApi({
-      config: { consoleDist },
+      config: { dataDir, consoleDist, faviconsEnabled: true },
       store,
       pipeline,
       probes,

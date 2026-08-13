@@ -1,4 +1,5 @@
 import type {
+  AuthStatusDto,
   BreakdownDim,
   BreakdownDto,
   CityPoint,
@@ -21,7 +22,9 @@ import type {
   RejectedSummaryDto,
   SankeyDto,
   SourceDto,
+  SourceHealthPoint,
   SourceInput,
+  SystemDbDto,
   SystemLogPage,
   TestConnectionResult,
   TimeseriesPoint,
@@ -53,6 +56,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface RangeQuery {
+  minutes: number;
+  from?: number;
+  to?: number;
+}
+
+function rangeParams(range: number | RangeQuery): RangeQuery {
+  return typeof range === "number" ? { minutes: range } : range;
+}
+
 function qs<T extends object>(params: T): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -68,30 +81,47 @@ export const api = {
   device: (id: string) => request<DeviceDto>(`/api/devices/${id}`),
   flows: (query: FlowsQuery = {}) => request<FlowsPage>(`/api/flows${qs(query)}`),
   timeseries: (query: TimeseriesQuery) => request<TimeseriesPoint[]>(`/api/timeseries${qs(query)}`),
-  timeseriesMulti: (query: { scope: "device" | "policy"; minutes: number; limit?: number }) =>
-    request<MultiSeriesDto[]>(`/api/timeseries/multi${qs(query)}`),
-  breakdown: (query: { dim: BreakdownDim; minutes: number; deviceId?: string; limit?: number }) =>
+  timeseriesMulti: (
+    query: { scope: "device" | "policy"; limit?: number } & RangeQuery,
+  ) => request<MultiSeriesDto[]>(`/api/timeseries/multi${qs(query)}`),
+  breakdown: (query: { dim: BreakdownDim; deviceId?: string; limit?: number } & RangeQuery) =>
     request<BreakdownDto>(`/api/breakdown${qs(query)}`),
-  sankey: (query: { minutes: number; limit?: number }) =>
+  sankey: (query: { limit?: number } & RangeQuery) =>
     request<SankeyDto>(`/api/sankey${qs(query)}`),
+  chains: (query: { limit?: number } & RangeQuery) =>
+    request<SankeyDto>(`/api/chains${qs(query)}`),
   punchcard: (days: number) => request<PunchcardDto>(`/api/insights/punchcard${qs({ days })}`),
   daily: (days: number) => request<DailyPoint[]>(`/api/insights/daily${qs({ days })}`),
-  movers: (minutes: number) => request<MoversDto>(`/api/insights/movers${qs({ minutes })}`),
+  movers: (range: number | RangeQuery) =>
+    request<MoversDto>(`/api/insights/movers${qs(rangeParams(range))}`),
   firstSeen: (days: number) => request<FirstSeenDto>(`/api/insights/firstseen${qs({ days })}`),
-  rejected: (minutes: number) =>
-    request<RejectedSummaryDto>(`/api/insights/rejected${qs({ minutes })}`),
-  deviceDetail: (id: string, minutes: number) =>
-    request<DeviceDetailDto>(`/api/devices/${encodeURIComponent(id)}/detail${qs({ minutes })}`),
-  cities: (minutes: number) => request<CityPoint[]>(`/api/destinations/cities${qs({ minutes })}`),
-  hostDetail: (host: string, minutes: number) =>
-    request<HostDetailDto>(`/api/hosts/${encodeURIComponent(host)}${qs({ minutes })}`),
-  dnsSummary: (minutes: number) => request<DnsSummaryDto>(`/api/dns/summary${qs({ minutes })}`),
+  rejected: (range: number | RangeQuery) =>
+    request<RejectedSummaryDto>(`/api/insights/rejected${qs(rangeParams(range))}`),
+  deviceDetail: (id: string, range: number | RangeQuery) =>
+    request<DeviceDetailDto>(
+      `/api/devices/${encodeURIComponent(id)}/detail${qs(rangeParams(range))}`,
+    ),
+  cities: (range: number | RangeQuery) =>
+    request<CityPoint[]>(`/api/destinations/cities${qs(rangeParams(range))}`),
+  hostDetail: (host: string, range: number | RangeQuery) =>
+    request<HostDetailDto>(`/api/hosts/${encodeURIComponent(host)}${qs(rangeParams(range))}`),
+  dnsSummary: (range: number | RangeQuery) =>
+    request<DnsSummaryDto>(`/api/dns/summary${qs(rangeParams(range))}`),
+  authStatus: () => request<AuthStatusDto>("/api/auth/status"),
+  login: (token: string) =>
+    request<AuthStatusDto>("/api/auth/login", { method: "POST", body: JSON.stringify({ token }) }),
+  logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
   destinations: () => request<DestinationsDto>("/api/destinations"),
   countryDevices: (code: string) =>
     request<CountryDeviceShare[]>(`/api/destinations/${encodeURIComponent(code)}/devices`),
   dnsLogs: (query: LogsQuery = {}) => request<DnsLogPage>(`/api/logs/dns${qs(query)}`),
   systemLogs: (query: LogsQuery = {}) => request<SystemLogPage>(`/api/logs/system${qs(query)}`),
   sources: () => request<SourceDto[]>("/api/sources"),
+  sourceHealth: (id: string, range: number | RangeQuery) =>
+    request<SourceHealthPoint[]>(
+      `/api/sources/${encodeURIComponent(id)}/health${qs(rangeParams(range))}`,
+    ),
+  systemDb: () => request<SystemDbDto>("/api/system/db"),
   createSource: (input: SourceInput) =>
     request<SourceDto>("/api/sources", { method: "POST", body: JSON.stringify(input) }),
   updateSource: (id: string, patch: Partial<SourceInput>) =>

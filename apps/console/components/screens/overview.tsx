@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { EventDto } from "@the-network/schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { BarsList } from "@/components/charts/bars-list";
 import { DonutChart } from "@/components/charts/donut";
@@ -11,6 +12,7 @@ import { MiniBars } from "@/components/charts/mini-bars";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { Sparkline } from "@/components/charts/sparkline";
 import { StackedAreaChart } from "@/components/charts/stacked-area";
+import { ArrowLink } from "@/components/ui/arrow-link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -77,7 +79,7 @@ function KpiTile({
 }: {
   label: string;
   value: string;
-  sub?: string;
+  sub?: ReactNode;
   loading?: boolean;
   valueClassName?: string;
   children?: ReactNode;
@@ -109,7 +111,7 @@ function KpiTile({
 export function OverviewScreen() {
   const router = useRouter();
   const live = useLive();
-  const { minutes } = useTimeRange();
+  const { minutes, rangeQuery } = useTimeRange();
   const [throughputMode, setThroughputMode] = useState<ThroughputMode>("total");
   const [zoom, setZoom] = useState<ZoomRange | null>(null);
 
@@ -124,42 +126,53 @@ export function OverviewScreen() {
     refetchInterval: 30000,
   });
   const { data: timeseriesData, isLoading: timeseriesLoading } = useQuery({
-    queryKey: ["timeseries", "wan", minutes],
-    queryFn: () => api.timeseries({ scope: "wan", minutes }),
+    queryKey: ["timeseries", "wan", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.timeseries({ scope: "wan", ...rangeQuery }),
     refetchInterval: 15000,
   });
   const zoomMinutes = zoom ? Math.max(5, Math.round((zoom.to - zoom.from) / 60000)) : minutes;
   const { data: zoomTimeseriesData, isLoading: zoomTimeseriesLoading } = useQuery({
-    queryKey: ["timeseries", "wan", "zoom", minutes, zoomMinutes, zoom?.from, zoom?.to],
-    queryFn: () => api.timeseries({ scope: "wan", minutes: zoomMinutes }),
+    queryKey: [
+      "timeseries",
+      "wan",
+      "zoom",
+      minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+      zoomMinutes,
+      zoom?.from,
+      zoom?.to,
+    ],
+    queryFn: () =>
+      api.timeseries({ scope: "wan", minutes: zoomMinutes, from: zoom!.from, to: zoom!.to }),
     enabled: zoom !== null && throughputMode === "total",
     refetchInterval: 15000,
   });
   const multiScope = throughputMode === "devices" ? "device" : "policy";
   const { data: multiSeriesData, isLoading: multiSeriesLoading } = useQuery({
-    queryKey: ["timeseries-multi", multiScope, minutes],
-    queryFn: () => api.timeseriesMulti({ scope: multiScope, minutes, limit: 5 }),
+    queryKey: ["timeseries-multi", multiScope, minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.timeseriesMulti({ scope: multiScope, limit: 5, ...rangeQuery }),
     enabled: throughputMode !== "total",
     refetchInterval: 20000,
   });
   const { data: destinationBreakdown, isLoading: destinationLoading } = useQuery({
-    queryKey: ["breakdown", "domain", minutes, 8],
-    queryFn: () => api.breakdown({ dim: "domain", minutes, limit: 8 }),
+    queryKey: ["breakdown", "domain", minutes, rangeQuery.from, rangeQuery.to, 8],
+    queryFn: () => api.breakdown({ dim: "domain", limit: 8, ...rangeQuery }),
     refetchInterval: 30000,
   });
   const { data: processBreakdown, isLoading: processLoading } = useQuery({
-    queryKey: ["breakdown", "process", minutes, 8],
-    queryFn: () => api.breakdown({ dim: "process", minutes, limit: 8 }),
+    queryKey: ["breakdown", "process", minutes, rangeQuery.from, rangeQuery.to, 8],
+    queryFn: () => api.breakdown({ dim: "process", limit: 8, ...rangeQuery }),
     refetchInterval: 30000,
   });
   const { data: dns, isLoading: dnsLoading } = useQuery({
-    queryKey: ["dns-summary", minutes],
-    queryFn: () => api.dnsSummary(minutes),
+    queryKey: ["dns-summary", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.dnsSummary(rangeQuery),
     refetchInterval: 30000,
   });
   const { data: rejected, isLoading: rejectedLoading } = useQuery({
-    queryKey: ["rejected", minutes],
-    queryFn: () => api.rejected(minutes),
+    queryKey: ["rejected", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.rejected(rangeQuery),
     refetchInterval: 30000,
   });
 
@@ -296,7 +309,15 @@ export function OverviewScreen() {
         <KpiTile
           label="Today"
           loading={initialSummaryLoading}
-          sub={`↓ ${formatBytes(todayIn)} · ↑ ${formatBytes(todayOut)}`}
+          sub={
+            <span className="inline-flex items-center gap-1">
+              <ArrowDown className="size-3 shrink-0" />
+              {formatBytes(todayIn)}
+              <span>·</span>
+              <ArrowUp className="size-3 shrink-0" />
+              {formatBytes(todayOut)}
+            </span>
+          }
           value={formatBytes(todayIn + todayOut)}
         />
         <KpiTile
@@ -316,8 +337,13 @@ export function OverviewScreen() {
               ) : (
                 <div className="mt-0.5 font-mono text-sm tabular-nums">
                   {formatBytes(todayIn + todayOut)}
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    today · ↓ {formatBytes(todayIn)} · ↑ {formatBytes(todayOut)}
+                  <span className="text-muted-foreground ml-2 inline-flex items-center gap-1 text-xs">
+                    today ·
+                    <ArrowDown className="size-3 shrink-0" />
+                    {formatBytes(todayIn)}
+                    ·
+                    <ArrowUp className="size-3 shrink-0" />
+                    {formatBytes(todayOut)}
                   </span>
                 </div>
               )}
@@ -511,7 +537,11 @@ export function OverviewScreen() {
           )}
         </Card>
 
-        <Card title="DNS" className="col-span-12 xl:col-span-4">
+        <Card
+          title="DNS"
+          action={<ArrowLink href="/logs">All lookups</ArrowLink>}
+          className="col-span-12 xl:col-span-4"
+        >
           {dnsLoading && !dns ? (
             <Skeleton className="h-52 w-full" />
           ) : dnsSeries.length === 0 && (dns?.topDomains.length ?? 0) === 0 ? (
@@ -542,12 +572,6 @@ export function OverviewScreen() {
                   </div>
                 ))}
               </div>
-              <Link
-                href="/logs"
-                className="text-muted-foreground hover:text-foreground mt-4 inline-flex text-xs"
-              >
-                All lookups →
-              </Link>
             </>
           )}
         </Card>
@@ -575,7 +599,11 @@ export function OverviewScreen() {
           )}
         </Card>
 
-        <Card title="Rejected & failed" className="col-span-12 xl:col-span-6">
+        <Card
+          title="Rejected & failed"
+          action={<ArrowLink href="/insights">Insights</ArrowLink>}
+          className="col-span-12 xl:col-span-6"
+        >
           {rejectedLoading && !rejected ? (
             <Skeleton className="h-40 w-full" />
           ) : rejectedBars.length === 0 && (rejected?.topHosts.length ?? 0) === 0 ? (
@@ -601,12 +629,6 @@ export function OverviewScreen() {
                   ))}
                 </div>
               </div>
-              <Link
-                href="/insights"
-                className="text-muted-foreground hover:text-foreground mt-4 inline-flex text-xs"
-              >
-                Insights →
-              </Link>
             </>
           )}
         </Card>

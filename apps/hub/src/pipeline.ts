@@ -9,10 +9,12 @@ import type {
   ProbeEvent,
   SummaryPush,
 } from '@the-network/schema';
+import { createAsnLookup, type AsnLookup } from './asn.ts';
 import { createGeoLookup, type GeoLookup, type GeoResolver } from './geo.ts';
 import { Identity } from './identity.ts';
 import type { Logger } from './logger.ts';
 import { logger } from './logger.ts';
+import { resolveRdns, type RdnsLookup } from './rdns.ts';
 import type { FlowWrite, RollupIncrement } from './store.ts';
 import { Store } from './store.ts';
 
@@ -23,6 +25,7 @@ const DEVICE_ONLINE_MS = 120_000;
 interface RegistryRow extends FlowWrite {
   deviceName: string;
   geoResolved: boolean;
+  asnResolved: boolean;
   dirty: boolean;
   pendingBytesIn: number;
   pendingBytesOut: number;
@@ -52,6 +55,9 @@ export interface PipelineOptions {
   now?: () => number;
   logger?: Logger;
   geoLookup?: GeoResolver;
+  asnDbPath?: string;
+  asnLookup?: AsnLookup;
+  rdnsLookup?: RdnsLookup;
 }
 
 function flowDto(row: RegistryRow): FlowDto {
@@ -79,6 +85,9 @@ function flowDto(row: RegistryRow): FlowDto {
     ...(row.proxied === undefined ? {} : { proxied: row.proxied }),
     ...(row.connectMs === undefined ? {} : { connectMs: row.connectMs }),
     ...(row.city === undefined ? {} : { city: row.city }),
+    ...(row.asn === undefined ? {} : { asn: row.asn }),
+    ...(row.asOrg === undefined ? {} : { asOrg: row.asOrg }),
+    ...(row.rdns === undefined ? {} : { rdns: row.rdns }),
     ...(row.startedAt === undefined ? {} : { startedAt: row.startedAt }),
     ...(row.endedAt === undefined ? {} : { endedAt: row.endedAt }),
   };
@@ -114,6 +123,8 @@ export class Pipeline {
   private readonly now: () => number;
   private readonly log: Logger;
   private readonly geoLookup: GeoLookup;
+  private readonly asnLookup: AsnLookup;
+  private readonly rdnsLookup: RdnsLookup;
 
   constructor(
     private readonly store: Store,
@@ -124,6 +135,12 @@ export class Pipeline {
     this.now = options.now ?? Date.now;
     this.log = options.logger ?? logger;
     this.geoLookup = createGeoLookup(options.geoLookup);
+    this.asnLookup =
+      options.asnLookup ??
+      (options.asnDbPath === undefined
+        ? () => undefined
+        : createAsnLookup(options.asnDbPath, this.log));
+    this.rdnsLookup = options.rdnsLookup ?? resolveRdns;
     this.store.closeStalePresence(this.now());
     if (options.autoStart !== false) this.start();
   }
@@ -203,6 +220,7 @@ export class Pipeline {
     const endedAt = event.state === 'active' ? current?.endedAt : event.ts;
     const ip = event.dst.ip ?? current?.ip;
     const geo = current?.geoResolved || ip === undefined ? undefined : this.geoLookup(ip);
+    const asn = current?.asnResolved || ip === undefined ? undefined : this.asnLookup(ip);
     const row: RegistryRow = {
       id: event.flowId,
       sourceId,
@@ -225,12 +243,16 @@ export class Pipeline {
       proxied: current?.proxied ?? event.attrs?.proxied,
       connectMs: current?.connectMs ?? event.attrs?.connectMs,
       country: current?.country ?? geo?.country,
+      asn: current?.asn ?? asn?.asn,
+      asOrg: current?.asOrg ?? asn?.org,
+      rdns: current?.rdns,
       city: current?.city ?? geo?.city,
       lat: current?.lat ?? geo?.lat,
       lon: current?.lon ?? geo?.lon,
       startedAt: current?.startedAt ?? event.attrs?.startedAt,
       ...(endedAt === undefined ? {} : { endedAt }),
       geoResolved: current?.geoResolved === true || geo !== undefined,
+      asnResolved: current?.asnResolved === true || asn !== undefined,
       dirty: true,
       pendingBytesIn: (current?.pendingBytesIn ?? 0) + event.bytesIn,
       pendingBytesOut: (current?.pendingBytesOut ?? 0) + event.bytesOut,
@@ -342,6 +364,9 @@ export class Pipeline {
       ...(row.proxied === undefined ? {} : { proxied: row.proxied }),
       ...(row.connectMs === undefined ? {} : { connectMs: row.connectMs }),
       ...(row.country === undefined ? {} : { country: row.country }),
+      ...(row.asn === undefined ? {} : { asn: row.asn }),
+      ...(row.asOrg === undefined ? {} : { asOrg: row.asOrg }),
+      ...(row.rdns === undefined ? {} : { rdns: row.rdns }),
       ...(row.city === undefined ? {} : { city: row.city }),
       ...(row.lat === undefined ? {} : { lat: row.lat }),
       ...(row.lon === undefined ? {} : { lon: row.lon }),
@@ -350,6 +375,11 @@ export class Pipeline {
       rollupBytesIn: row.pendingBytesIn,
       rollupBytesOut: row.pendingBytesOut,
     }));
+    const hostless = dirty.flatMap((row) =>
+      row.ip !== undefined && !row.host && row.rdns === undefined
+        ? [{ id: row.id, ip: row.ip }]
+        : [],
+    );
     const rollups = this.pendingRollups;
     this.store.writeFlush({ flows, rollups });
     this.pendingRollups = [];
@@ -358,6 +388,16 @@ export class Pipeline {
       row.pendingBytesIn = 0;
       row.pendingBytesOut = 0;
       if (row.state !== 'active') this.registry.delete(row.id);
+    }
+    for (const flow of hostless) {
+      void this.rdnsLookup(flow.ip)
+        .then((rdns) => {
+          if (rdns === undefined) return;
+          const row = this.registry.get(flow.id);
+          if (row?.ip === flow.ip) row.rdns ??= rdns;
+          this.store.updateFlowRdns(flow.id, rdns);
+        })
+        .catch(() => {});
     }
   }
 

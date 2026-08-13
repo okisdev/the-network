@@ -90,6 +90,18 @@ export class ProbeManager {
     return this.statuses.get(sourceId) ?? { state: 'stopped' };
   }
 
+  sampleHealth(ts: number = this.now()): void {
+    for (const source of this.store.listSources()) {
+      const status = this.getStatus(source.id);
+      this.store.appendSourceHealth(
+        source.id,
+        ts,
+        status.state === 'ok',
+        status.lastLatencyMs,
+      );
+    }
+  }
+
   getStats(sourceId: string): { lastEventAt?: number; eventsPerMinute?: number } {
     const stats = this.stats.get(sourceId);
     if (stats === undefined) return {};

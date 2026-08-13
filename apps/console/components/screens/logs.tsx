@@ -134,10 +134,10 @@ export function LogsScreen() {
 }
 
 function DnsAnalytics() {
-  const { minutes } = useTimeRange();
+  const { minutes, rangeQuery } = useTimeRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["dnsSummary", minutes],
-    queryFn: () => api.dnsSummary(minutes),
+    queryKey: ["dnsSummary", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.dnsSummary(rangeQuery),
     refetchInterval: 30000,
   });
 

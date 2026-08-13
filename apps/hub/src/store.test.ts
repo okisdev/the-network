@@ -85,6 +85,9 @@ describe('Store', () => {
         process_path: 'TEXT',
         proxied: 'INTEGER',
         connect_ms: 'INTEGER',
+        asn: 'INTEGER',
+        as_org: 'TEXT',
+        rdns: 'TEXT',
         city: 'TEXT',
         lat: 'REAL',
         lon: 'REAL',
@@ -103,6 +106,20 @@ describe('Store', () => {
     } finally {
       legacyDb.close();
     }
+  });
+
+  it('appends, lists, and sweeps source health samples', () => {
+    const day = 86_400_000;
+    store.appendSourceHealth('source-1', NOW - 31 * day, false);
+    store.appendSourceHealth('source-1', NOW - 30_000, true, 18);
+    store.appendSourceHealth('source-1', NOW - 60_000, false);
+
+    expect(store.listSourceHealth('source-1', NOW - 60_000, NOW)).toEqual([
+      { ts: NOW - 60_000, ok: false },
+      { ts: NOW - 30_000, ok: true, latencyMs: 18 },
+    ]);
+    expect(store.sweepRetention(NOW)).toMatchObject({ sourceHealth: 1 });
+    expect(store.listSourceHealth('source-1', 0, NOW)).toHaveLength(2);
   });
 
   it('writes flows with matching minute and hour rollups', () => {
@@ -130,6 +147,9 @@ describe('Store', () => {
           proxied: true,
           connectMs: 42,
           country: 'US',
+          asn: 15169,
+          asOrg: 'Google LLC',
+          rdns: 'dns.google',
           city: 'Mountain View',
           lat: 37.386,
           lon: -122.0838,
@@ -145,6 +165,9 @@ describe('Store', () => {
       processPath: '/Applications/Browser.app/Browser',
       proxied: true,
       connectMs: 42,
+      asn: 15169,
+      asOrg: 'Google LLC',
+      rdns: 'dns.google',
       city: 'Mountain View',
     });
     expect(db.prepare('SELECT lat, lon FROM flows WHERE id = ?').get('flow-1')).toEqual({
@@ -164,6 +187,36 @@ describe('Store', () => {
       topDestinations: [{ host: 'example.co.uk', bytes: 150 }],
       policySplit: [{ policy: 'Proxy', bytes: 150 }],
     });
+  });
+
+  it('zero-fills every aligned bucket in an explicit timeseries window', () => {
+    const end = Math.floor(NOW / 60_000) * 60_000;
+    const from = end - 2 * 60_000;
+    store.upsertDevice({
+      id: 'device-1',
+      name: 'Laptop',
+      firstSeenAt: from,
+      lastSeenAt: end,
+    });
+    store.writeFlush({
+      flows: [
+        {
+          id: 'flow-1',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: end,
+          bytesIn: 120,
+          bytesOut: 60,
+          state: 'completed',
+        },
+      ],
+    });
+
+    expect(store.timeseries('device:device-1', 525_600, NOW, { from, to: end })).toEqual([
+      { ts: from, in: 0, out: 0 },
+      { ts: from + 60_000, in: 0, out: 0 },
+      { ts: end, in: 2, out: 1 },
+    ]);
   });
 
   it('paginates newest first without gaps at equal timestamps', () => {
@@ -487,11 +540,11 @@ describe('Store', () => {
     const domains = store.breakdown('domain', 60, undefined, 12, NOW);
     expect(domains.window).toEqual({ from: NOW - 3_600_000, to: NOW, clamped: false });
     expect(domains.rows).toEqual([
-      { key: 'example.com', bytesIn: 900, bytesOut: 0, flows: 2, devices: 2 },
-      { key: 'other.net', bytesIn: 120, bytesOut: 0, flows: 1, devices: 1 },
+      { key: 'example.com', country: 'US', bytesIn: 900, bytesOut: 0, flows: 2, devices: 2 },
+      { key: 'other.net', country: 'CA', bytesIn: 120, bytesOut: 0, flows: 1, devices: 1 },
     ]);
     expect(store.breakdown('process', 60, undefined, 12, NOW).rows).toEqual([
-      { key: 'Browser', bytesIn: 600, bytesOut: 0, flows: 1, devices: 1 },
+      { key: 'Browser', country: 'US', bytesIn: 600, bytesOut: 0, flows: 1, devices: 1 },
     ]);
     expect(store.breakdown('policy', 60, undefined, 12, NOW).rows).toContainEqual({
       key: 'unknown',
@@ -505,6 +558,107 @@ describe('Store', () => {
       from: NOW - 14 * 86_400_000,
       to: NOW,
       clamped: true,
+    });
+  });
+
+  it('aggregates only hostless traffic in explicit direct-IP breakdown windows', () => {
+    const from = NOW - 120_000;
+    const to = NOW - 20_000;
+    for (const [id, name] of [
+      ['device-1', 'Laptop'],
+      ['device-2', 'Phone'],
+    ] as const) {
+      store.upsertDevice({ id, name, firstSeenAt: from, lastSeenAt: NOW });
+    }
+    store.writeFlush({
+      flows: [
+        {
+          id: 'hostless-1',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 60_000,
+          ip: '1.1.1.1',
+          asn: 13335,
+          asOrg: 'Cloudflare, Inc.',
+          rdns: 'one.one.one.one',
+          bytesIn: 100,
+          bytesOut: 10,
+          state: 'completed',
+        },
+        {
+          id: 'hostless-2',
+          sourceId: 'source-1',
+          deviceId: 'device-2',
+          ts: NOW - 30_000,
+          host: '',
+          ip: '1.1.1.1',
+          asn: 13335,
+          asOrg: 'Cloudflare, Inc.',
+          bytesIn: 40,
+          bytesOut: 5,
+          state: 'completed',
+        },
+        {
+          id: 'hosted',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 30_000,
+          host: 'one.one.one.one',
+          ip: '1.1.1.1',
+          asn: 15169,
+          asOrg: 'Google LLC',
+          bytesIn: 1_000,
+          bytesOut: 1_000,
+          state: 'completed',
+        },
+        {
+          id: 'outside-window',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 180_000,
+          ip: '1.1.1.1',
+          asn: 64500,
+          asOrg: 'Outside Network',
+          bytesIn: 2_000,
+          bytesOut: 2_000,
+          state: 'completed',
+        },
+      ],
+    });
+
+    expect(store.breakdown('ip', 525_600, undefined, 12, NOW, { from, to })).toEqual({
+      window: { from, to, clamped: false },
+      rows: [
+        {
+          key: '1.1.1.1',
+          label: 'one.one.one.one',
+          bytesIn: 140,
+          bytesOut: 15,
+          flows: 2,
+          devices: 2,
+        },
+      ],
+    });
+    expect(store.breakdown('asn', 525_600, undefined, 12, NOW, { from, to })).toEqual({
+      window: { from, to, clamped: false },
+      rows: [
+        {
+          key: '15169',
+          label: 'Google LLC',
+          bytesIn: 1_000,
+          bytesOut: 1_000,
+          flows: 1,
+          devices: 1,
+        },
+        {
+          key: '13335',
+          label: 'Cloudflare, Inc.',
+          bytesIn: 140,
+          bytesOut: 15,
+          flows: 2,
+          devices: 2,
+        },
+      ],
     });
   });
 
@@ -657,8 +811,8 @@ describe('Store', () => {
     const detail = store.hostDetail('example.com', 5, NOW);
     expect(detail.country).toBe('CA');
     expect(detail.devices).toEqual([
-      { key: 'device-2', label: 'Phone', bytesIn: 280, bytesOut: 20, flows: 1, devices: 1 },
-      { key: 'device-1', label: 'Laptop', bytesIn: 80, bytesOut: 20, flows: 1, devices: 1 },
+      { key: 'device-2', label: 'Phone', country: 'CA', bytesIn: 280, bytesOut: 20, flows: 1, devices: 1 },
+      { key: 'device-1', label: 'Laptop', country: 'US', bytesIn: 80, bytesOut: 20, flows: 1, devices: 1 },
     ]);
     expect(detail.processes.map((row) => row.key)).toEqual(['Agent', 'Browser']);
     expect(detail.ports.map((row) => row.key)).toEqual(['8443', '443']);
@@ -757,6 +911,103 @@ describe('Store', () => {
     );
   });
 
+  it('aggregates ranked decision chains with shared prefixes and per-path edge deduplication', () => {
+    store.writeFlush({
+      flows: [
+        {
+          id: 'chain-1',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW,
+          bytesIn: 100,
+          bytesOut: 0,
+          state: 'completed',
+          policyChain: ['Rule set', 'Proxy group', 'Singapore'],
+        },
+        {
+          id: 'chain-2',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 1,
+          bytesIn: 40,
+          bytesOut: 10,
+          state: 'completed',
+          policyChain: ['Rule set', 'Proxy group', 'Singapore'],
+        },
+        {
+          id: 'chain-3',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 2,
+          bytesIn: 80,
+          bytesOut: 0,
+          state: 'completed',
+          policyChain: ['Rule set', 'Proxy group', 'Direct'],
+        },
+        {
+          id: 'chain-4',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 3,
+          bytesIn: 20,
+          bytesOut: 0,
+          state: 'completed',
+          policyChain: ['Fallback', 'Direct'],
+        },
+        {
+          id: 'chain-cycle',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 4,
+          bytesIn: 10,
+          bytesOut: 0,
+          state: 'completed',
+          policyChain: ['Rule set', 'Proxy group', 'Rule set', 'Proxy group'],
+        },
+        {
+          id: 'chain-single',
+          sourceId: 'source-1',
+          deviceId: 'device-1',
+          ts: NOW - 5,
+          bytesIn: 1_000,
+          bytesOut: 0,
+          state: 'completed',
+          policyChain: ['Ignored'],
+        },
+      ],
+    });
+
+    const ranked = store.decisionChains(60, 2, NOW);
+    expect(ranked.nodes).toEqual([
+      { id: 'policy:key:Rule set', label: 'Rule set', kind: 'policy' },
+      { id: 'policy:key:Proxy group', label: 'Proxy group', kind: 'policy' },
+      { id: 'policy:key:Singapore', label: 'Singapore', kind: 'policy' },
+      { id: 'policy:key:Direct', label: 'Direct', kind: 'policy' },
+    ]);
+    expect(ranked.links).toEqual([
+      { source: 0, target: 1, bytes: 230 },
+      { source: 1, target: 2, bytes: 150 },
+      { source: 1, target: 3, bytes: 80 },
+    ]);
+
+    const limited = store.decisionChains(60, 1, NOW);
+    expect(limited.nodes.map((node) => node.label)).toEqual(['Rule set', 'Proxy group', 'Singapore']);
+    expect(limited.links).toEqual([
+      { source: 0, target: 1, bytes: 150 },
+      { source: 1, target: 2, bytes: 150 },
+    ]);
+
+    const all = store.decisionChains(60, 30, NOW);
+    const edgeBytes = new Map(
+      all.links.map((link) => [
+        `${all.nodes[link.source]!.label}>${all.nodes[link.target]!.label}`,
+        link.bytes,
+      ]),
+    );
+    expect(edgeBytes.get('Rule set>Proxy group')).toBe(240);
+    expect(edgeBytes.get('Proxy group>Rule set')).toBe(10);
+  });
+
   it('maps wan rollups into local punchcard and zero-filled daily buckets', () => {
     const currentHour = Math.floor(NOW / 3_600_000) * 3_600_000;
     const previousDay = new Date(currentHour);
@@ -808,6 +1059,16 @@ describe('Store', () => {
     });
 
     expect(store.movers(1, NOW)).toEqual({
+      devices: [
+        { key: 'device-2', label: 'Phone', current: 0, previous: 600 },
+        { key: 'device-1', label: 'Laptop', current: 400, previous: 100 },
+      ],
+      domains: [
+        { key: 'old.example', label: 'old.example', current: 0, previous: 500 },
+        { key: 'new.example', label: 'new.example', current: 300, previous: 0 },
+      ],
+    });
+    expect(store.movers(525_600, NOW, { from: current, to: current + 60_000 })).toEqual({
       devices: [
         { key: 'device-2', label: 'Phone', current: 0, previous: 600 },
         { key: 'device-1', label: 'Laptop', current: 400, previous: 100 },
@@ -943,6 +1204,7 @@ describe('Store', () => {
     });
 
     const rejected = store.rejected(3, NOW);
+    expect(store.countRejectedFlows(NOW - 3 * 60_000, NOW)).toBe(2);
     expect(rejected.series).toHaveLength(3);
     expect(rejected.series.reduce((sum, point) => sum + point.flows, 0)).toBe(2);
     expect(rejected.topHosts).toEqual([

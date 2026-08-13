@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AsnLookup } from './asn.ts';
 import { openDatabase } from './db.ts';
 import type { GeoLookup } from './geo.ts';
 import { Identity } from './identity.ts';
 import { Pipeline } from './pipeline.ts';
+import type { RdnsLookup } from './rdns.ts';
 import { Store } from './store.ts';
 
 const NOW = new Date(2026, 0, 2, 12, 0, 30).getTime();
@@ -18,6 +20,8 @@ describe('Pipeline', () => {
   let pipeline: Pipeline;
   let now: number;
   let geoLookup: ReturnType<typeof vi.fn<GeoLookup>>;
+  let asnLookup: ReturnType<typeof vi.fn<AsnLookup>>;
+  let rdnsLookup: ReturnType<typeof vi.fn<RdnsLookup>>;
 
   beforeEach(() => {
     now = NOW;
@@ -29,10 +33,16 @@ describe('Pipeline', () => {
         ? { country: 'US', city: 'Mountain View', lat: 37.386, lon: -122.0838 }
         : undefined,
     );
+    asnLookup = vi.fn((ip: string) =>
+      ip === '8.8.8.8' ? { asn: 15169, org: 'Google LLC' } : undefined,
+    );
+    rdnsLookup = vi.fn(async () => undefined);
     pipeline = new Pipeline(store, new Identity(store), {
       autoStart: false,
       now: () => now,
       geoLookup,
+      asnLookup,
+      rdnsLookup,
     });
   });
 
@@ -127,6 +137,8 @@ describe('Pipeline', () => {
         connectMs: 42,
         country: 'US',
         city: 'Mountain View',
+        asn: 15169,
+        asOrg: 'Google LLC',
       }),
     ]);
 
@@ -140,12 +152,51 @@ describe('Pipeline', () => {
       connectMs: 42,
       country: 'US',
       city: 'Mountain View',
+      asn: 15169,
+      asOrg: 'Google LLC',
     });
     expect(db.prepare('SELECT lat, lon FROM flows WHERE id = ?').get('flow-attrs')).toEqual({
       lat: 37.386,
       lon: -122.0838,
     });
     expect(geoLookup).toHaveBeenCalledTimes(1);
+    expect(asnLookup).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves hostless flow names after the flush completes', async () => {
+    rdnsLookup.mockResolvedValue('dns.google');
+    pipeline.ingest('source-1', [
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'hostless-flow',
+        device: { mac: '00:11:22:33:44:88', name: 'Desktop' },
+        dst: { ip: '8.8.8.8', proto: 'udp' },
+        bytesIn: 10,
+        bytesOut: 2,
+        state: 'completed',
+      },
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'hosted-flow',
+        device: { mac: '00:11:22:33:44:88' },
+        dst: { host: 'example.com', ip: '1.1.1.1', proto: 'tcp' },
+        bytesIn: 5,
+        bytesOut: 1,
+        state: 'completed',
+      },
+    ]);
+
+    pipeline.flush();
+
+    expect(rdnsLookup).toHaveBeenCalledTimes(1);
+    expect(rdnsLookup).toHaveBeenCalledWith('8.8.8.8');
+    await vi.waitFor(() => {
+      expect(store.listFlows().flows.find((flow) => flow.id === 'hostless-flow')).toMatchObject({
+        rdns: 'dns.google',
+      });
+    });
   });
 
   it('uses a presence mac and ip binding for later ip-only flows', () => {

@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { FlowDto, FlowState, TimeseriesPoint } from "@the-network/schema";
-import { ChevronRight, Pause, Play, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Download, Pause, Play, X } from "lucide-react";
 import {
   memo,
   useCallback,
@@ -34,7 +34,9 @@ import {
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useLive } from "@/contexts/live-provider";
+import { useTimeRange } from "@/contexts/timerange-provider";
 import { api } from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
 import {
   formatBytes,
   formatDuration,
@@ -186,6 +188,7 @@ function buildGroups(flows: FlowDto[]): DeviceGroup[] {
 
 export function FlowsScreen() {
   const live = useLive();
+  const { rangeQuery, isCustom } = useTimeRange();
   const [params, update] = useQueryParams();
   const [paused, setPaused] = useState(false);
   const [view, setView] = useState<ViewMode>("stream");
@@ -219,7 +222,7 @@ export function FlowsScreen() {
       portFilter ||
       debouncedSearch.trim(),
   );
-  const serverMode = paused || filterActive;
+  const serverMode = paused || filterActive || isCustom;
 
   const { data: devices } = useQuery({
     queryKey: ["devices"],
@@ -252,6 +255,8 @@ export function FlowsScreen() {
         processFilter || null,
         port ?? null,
         debouncedSearch.trim() || null,
+        isCustom ? rangeQuery.from : null,
+        isCustom ? rangeQuery.to : null,
       ] as const,
     [
       deviceId,
@@ -262,6 +267,9 @@ export function FlowsScreen() {
       processFilter,
       port,
       debouncedSearch,
+      isCustom,
+      rangeQuery.from,
+      rangeQuery.to,
     ],
   );
 
@@ -281,6 +289,8 @@ export function FlowsScreen() {
         proto: protoFilter || undefined,
         port,
         process: processFilter || undefined,
+        from: isCustom ? rangeQuery.from : undefined,
+        to: isCustom ? rangeQuery.to : undefined,
         limit: 100,
       }),
     enabled: serverMode,
@@ -324,6 +334,8 @@ export function FlowsScreen() {
         proto: protoFilter || undefined,
         port,
         process: processFilter || undefined,
+        from: isCustom ? rangeQuery.from : undefined,
+        to: isCustom ? rangeQuery.to : undefined,
         limit: 100,
         cursor: nextCursor,
       });
@@ -347,6 +359,9 @@ export function FlowsScreen() {
     protoFilter,
     port,
     processFilter,
+    isCustom,
+    rangeQuery.from,
+    rangeQuery.to,
   ]);
 
   const rows = serverMode ? serverFlows : live.flows;
@@ -545,6 +560,54 @@ export function FlowsScreen() {
             {rows.length} flow{rows.length === 1 ? "" : "s"}
             {serverMode ? " · server" : " · live"}
           </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={rows.length === 0}
+            onClick={() =>
+              downloadCsv(
+                `flows-${new Date().toISOString().slice(0, 16).replace(":", "")}.csv`,
+                [
+                  "time",
+                  "device",
+                  "process",
+                  "host",
+                  "ip",
+                  "port",
+                  "proto",
+                  "policy",
+                  "rule",
+                  "state",
+                  "bytes_in",
+                  "bytes_out",
+                  "country",
+                  "proxied",
+                  "connect_ms",
+                ],
+                rows.map((flow) => [
+                  new Date(flow.ts).toISOString(),
+                  flow.deviceName,
+                  flow.process,
+                  flow.dst.host,
+                  flow.dst.ip,
+                  flow.dst.port,
+                  flow.dst.proto,
+                  flow.policy,
+                  flow.rule,
+                  flow.state,
+                  flow.bytesIn,
+                  flow.bytesOut,
+                  flow.country,
+                  flow.proxied ? "true" : "false",
+                  flow.connectMs,
+                ]),
+              )
+            }
+          >
+            <Download className="size-3.5" />
+            CSV
+          </Button>
           <div role="group" aria-label="Flow view">
             <SegmentedControl<ViewMode>
               value={view}
@@ -751,7 +814,7 @@ const FlowRow = memo(function FlowRow({
   virtualIndex: number;
   onSelect: () => void;
 }) {
-  const destination = flow.dst.host || flow.dst.ip || "—";
+  const destination = flow.dst.host || flow.rdns || flow.dst.ip || "—";
   const port = flow.dst.port != null ? `:${flow.dst.port}` : "";
   const policyTitle = flow.policyGroup
     ? `${flow.policyGroup} → ${flow.policy ?? "—"}`
@@ -781,7 +844,10 @@ const FlowRow = memo(function FlowRow({
         {flow.process ?? "—"}
       </span>
       <span className="min-w-0 truncate">
-        <span className={flow.dst.host ? "text-foreground font-medium" : "text-foreground"}>
+        <span
+          className={flow.dst.host || flow.rdns ? "text-foreground font-medium" : "text-foreground"}
+          title={flow.dst.ip}
+        >
           {destination}
         </span>
         {port && <span className="text-muted-foreground">{port}</span>}
@@ -1052,6 +1118,20 @@ function FlowInspector({
             {flow.country ? <CountryChip code={flow.country} /> : "—"}
           </DetailRow>
           {flow.city && <DetailRow label="City">{flow.city}</DetailRow>}
+          {flow.asn != null && (
+            <DetailRow label="AS">
+              <span className="font-mono text-xs tabular-nums">
+                {flow.asOrg ? `${flow.asOrg} · AS${flow.asn}` : `AS${flow.asn}`}
+              </span>
+            </DetailRow>
+          )}
+          {flow.rdns && (
+            <DetailRow label="rDNS">
+              <span className="block min-w-0 truncate font-mono text-xs" title={flow.rdns}>
+                {flow.rdns}
+              </span>
+            </DetailRow>
+          )}
         </DetailList>
       </InspectorSection>
 
@@ -1103,8 +1183,12 @@ function FlowInspector({
       <InspectorSection title="Traffic">
         <div className="space-y-2.5">
           <SplitBar inValue={flow.bytesIn} outValue={flow.bytesOut} max={total} />
-          <p className="font-mono text-xs tabular-nums">
-            ↓ {formatBytes(flow.bytesIn)} · ↑ {formatBytes(flow.bytesOut)}
+          <p className="flex items-center gap-1 font-mono text-xs tabular-nums">
+            <ArrowDown className="size-3 shrink-0" />
+            {formatBytes(flow.bytesIn)}
+            <span>·</span>
+            <ArrowUp className="size-3 shrink-0" />
+            {formatBytes(flow.bytesOut)}
           </p>
           {duration && <p className="text-muted-foreground text-xs">Duration {duration}</p>}
           {flow.connectMs != null && (

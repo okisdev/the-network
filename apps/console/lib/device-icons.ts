@@ -1,11 +1,11 @@
 import {
   Cctv,
+  CircleQuestionMark,
   Gamepad2,
   HardDrive,
   Laptop,
   Lightbulb,
   Monitor,
-  MonitorSmartphone,
   Printer,
   Router,
   Smartphone,
@@ -13,10 +13,20 @@ import {
   Tablet,
   Tv,
   Watch,
-  type LucideIcon,
 } from "lucide-react";
+import type { ComponentType } from "react";
+import { AppleIcon } from "@/components/icons/apple";
+import { XiaomiIcon } from "@/components/icons/xiaomi";
 
-const ICON_RULES: ReadonlyArray<[RegExp, LucideIcon]> = [
+export type DeviceGlyph = ComponentType<{ className?: string }>;
+
+const APPLE_PATTERN =
+  /com\.apple|\b(apple|iphone|ipad|ipod|imac|macbook|mac|airpods?|homepod|watch)\b/i;
+
+const XIAOMI_PATTERN =
+  /^(xiaomi|redmi|mijia|zhimi|yeelink|yeelight|lumi|aqara|chuangmi|roborock|rockrobo|viomi|yunmi|dreame|dmaker|deerma|dayang|cgllc|miaomiaoce|isa)[-_.]|xiaomi|redmi|mijia/i;
+
+const FORM_RULES: ReadonlyArray<[RegExp, DeviceGlyph]> = [
   [/iphone|phone/i, Smartphone],
   [/ipad|tablet/i, Tablet],
   [/macbook|laptop/i, Laptop],
@@ -32,11 +42,14 @@ const ICON_RULES: ReadonlyArray<[RegExp, LucideIcon]> = [
   [/light|bulb|plug/i, Lightbulb],
 ];
 
-export function deviceIcon(iconId?: string): LucideIcon {
-  if (iconId) {
-    for (const [pattern, icon] of ICON_RULES) {
-      if (pattern.test(iconId)) return icon;
+export function deviceIcon(iconId?: string, name?: string): DeviceGlyph {
+  const identity = [iconId, name].filter(Boolean).join(" ");
+  if (identity !== "") {
+    if (APPLE_PATTERN.test(identity)) return AppleIcon;
+    if (XIAOMI_PATTERN.test(identity)) return XiaomiIcon;
+    for (const [pattern, icon] of FORM_RULES) {
+      if (pattern.test(identity)) return icon;
     }
   }
-  return MonitorSmartphone;
+  return CircleQuestionMark;
 }

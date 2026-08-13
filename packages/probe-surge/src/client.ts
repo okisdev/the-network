@@ -3,10 +3,15 @@ const REQUEST_TIMEOUT_MS = 8_000;
 export class SurgeClient {
   readonly #baseUrl: string;
   readonly #apiKey: string;
+  #lastLatencyMs: number | undefined;
 
   constructor(baseUrl: string, apiKey: string) {
     this.#baseUrl = normalizeBaseUrl(baseUrl);
     this.#apiKey = apiKey;
+  }
+
+  get lastLatencyMs(): number | undefined {
+    return this.#lastLatencyMs;
   }
 
   getRecentRequests(signal?: AbortSignal): Promise<unknown> {
@@ -34,6 +39,7 @@ export class SurgeClient {
     const signal =
       outer !== undefined ? AbortSignal.any([timeout, outer]) : timeout;
 
+    const started = performance.now();
     const res = await fetch(`${this.#baseUrl}${path}`, {
       method: 'GET',
       headers: {
@@ -49,7 +55,9 @@ export class SurgeClient {
       throw err;
     }
 
-    return (await res.json()) as unknown;
+    const body = (await res.json()) as unknown;
+    this.#lastLatencyMs = performance.now() - started;
+    return body;
   }
 }
 

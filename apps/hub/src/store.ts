@@ -28,6 +28,8 @@ import type {
   PunchcardDto,
   RejectedSummaryDto,
   SankeyDto,
+  SourceHealthPoint,
+  SystemDbDto,
   SystemLogEntry,
   SystemLogPage,
   TimeseriesPoint,
@@ -39,6 +41,7 @@ import {
   FLOWS_RETENTION_MS,
   ROLLUP_HOUR_RETENTION_MS,
   ROLLUP_MINUTE_RETENTION_MS,
+  SOURCE_HEALTH_RETENTION_MS,
   SYSTEM_LOG_RETENTION_MS,
 } from './config.ts';
 
@@ -98,6 +101,9 @@ export interface FlowWrite {
   proxied?: boolean;
   connectMs?: number;
   country?: string;
+  asn?: number;
+  asOrg?: string;
+  rdns?: string;
   city?: string;
   lat?: number;
   lon?: number;
@@ -172,6 +178,9 @@ interface FlowRow {
   proxied: number | null;
   connect_ms: number | null;
   country: string | null;
+  asn: number | null;
+  as_org: string | null;
+  rdns: string | null;
   city: string | null;
   lat: number | null;
   lon: number | null;
@@ -211,6 +220,12 @@ interface SystemLogRow {
   level: SystemLogEntry['level'];
   scope: string;
   message: string;
+}
+
+interface SourceHealthRow {
+  ts: number;
+  ok: number;
+  latency_ms: number | null;
 }
 
 interface CountRow {
@@ -260,6 +275,7 @@ interface RollupBucketRow extends BucketRow {
 interface BreakdownSqlRow {
   key: string | number | null;
   label?: string | null;
+  country?: string | null;
   bytes_in: number;
   bytes_out: number;
   flows: number;
@@ -288,6 +304,7 @@ interface DnsAnswerRow {
 interface DomainSqlRow {
   host: string;
   device_id: string;
+  country: string | null;
   bytes_in: number;
   bytes_out: number;
   flows: number;
@@ -300,6 +317,15 @@ interface SankeySqlRow {
   policy: string | null;
   country: string | null;
   bytes: number;
+}
+
+interface ChainFlowRow {
+  ts: number;
+  bytes: number;
+  policy_chain_json: string | null;
+  rule: string | null;
+  policy_group: string | null;
+  policy: string | null;
 }
 
 interface MoverSqlRow {
@@ -323,33 +349,52 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
-function rollupWindow(minutes: number, now: number): {
+export interface ExplicitWindow {
+  from: number;
+  to: number;
+}
+
+function rollupWindow(minutes: number, now: number, window?: ExplicitWindow): {
   resolution: number;
   points: number;
   start: number;
   end: number;
   table: 'rollup_minute' | 'rollup_hour';
 } {
-  const resolution = minutes <= 2_880 ? MINUTE_MS : HOUR_MS;
-  const points = resolution === MINUTE_MS ? minutes : Math.ceil(minutes / 60);
-  const end = Math.floor(now / resolution) * resolution;
+  const span = window === undefined ? minutes * MINUTE_MS : window.to - window.from;
+  const resolution = span <= ROLLUP_MINUTE_RETENTION_MS ? MINUTE_MS : HOUR_MS;
+  const end = Math.floor((window?.to ?? now) / resolution) * resolution;
+  const points =
+    window === undefined
+      ? resolution === MINUTE_MS
+        ? minutes
+        : Math.ceil(minutes / 60)
+      : Math.floor((end - Math.floor(window.from / resolution) * resolution) / resolution) + 1;
   return {
     resolution,
     points,
-    start: end - (points - 1) * resolution,
+    start:
+      window === undefined
+        ? end - (points - 1) * resolution
+        : Math.floor(window.from / resolution) * resolution,
     end,
     table: resolution === MINUTE_MS ? 'rollup_minute' : 'rollup_hour',
   };
 }
 
-function retainedFlowWindow(minutes: number, now: number): {
+function retainedFlowWindow(minutes: number, now: number, window?: ExplicitWindow): {
   from: number;
   to: number;
   clamped: boolean;
 } {
-  const requestedFrom = now - minutes * MINUTE_MS;
+  const requestedFrom = window?.from ?? now - minutes * MINUTE_MS;
+  const requestedTo = window?.to ?? now;
   const horizon = now - FLOWS_RETENTION_MS;
-  return { from: Math.max(requestedFrom, horizon), to: now, clamped: requestedFrom < horizon };
+  return {
+    from: Math.max(requestedFrom, horizon),
+    to: requestedTo,
+    clamped: requestedFrom < horizon,
+  };
 }
 
 function localDayKey(ts: number): string {
@@ -424,6 +469,9 @@ function flowFromRow(row: FlowRow): FlowDto {
     ...(row.process_path === null ? {} : { processPath: row.process_path }),
     ...(row.proxied ? { proxied: true } : {}),
     ...(row.connect_ms === null ? {} : { connectMs: row.connect_ms }),
+    ...(row.asn === null ? {} : { asn: row.asn }),
+    ...(row.as_org === null ? {} : { asOrg: row.as_org }),
+    ...(row.rdns === null ? {} : { rdns: row.rdns }),
     ...(row.city === null ? {} : { city: row.city }),
     ...(row.started_at === null ? {} : { startedAt: row.started_at }),
     ...(row.ended_at === null ? {} : { endedAt: row.ended_at }),
@@ -607,6 +655,14 @@ export function runMigrations(db: BetterSqlite3.Database): void {
       message TEXT
     );
     CREATE INDEX IF NOT EXISTS system_log_ts_idx ON system_log (ts);
+    CREATE TABLE IF NOT EXISTS source_health (
+      source_id TEXT,
+      ts INTEGER,
+      ok INTEGER,
+      latency_ms INTEGER,
+      PRIMARY KEY (source_id, ts)
+    );
+    CREATE INDEX IF NOT EXISTS source_health_ts_idx ON source_health (ts);
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -621,6 +677,9 @@ export function runMigrations(db: BetterSqlite3.Database): void {
     ['process_path', 'TEXT'],
     ['proxied', 'INTEGER'],
     ['connect_ms', 'INTEGER'],
+    ['asn', 'INTEGER'],
+    ['as_org', 'TEXT'],
+    ['rdns', 'TEXT'],
     ['city', 'TEXT'],
     ['lat', 'REAL'],
     ['lon', 'REAL'],
@@ -694,6 +753,35 @@ export class Store {
 
   deleteSource(id: string): boolean {
     return this.db.prepare('DELETE FROM sources WHERE id = ?').run(id).changes > 0;
+  }
+
+  appendSourceHealth(
+    sourceId: string,
+    ts: number,
+    ok: boolean,
+    latencyMs?: number,
+  ): SourceHealthPoint {
+    this.db
+      .prepare(
+        `INSERT INTO source_health (source_id, ts, ok, latency_ms) VALUES (?, ?, ?, ?)
+         ON CONFLICT (source_id, ts) DO UPDATE SET ok = excluded.ok, latency_ms = excluded.latency_ms`,
+      )
+      .run(sourceId, ts, ok ? 1 : 0, latencyMs ?? null);
+    return { ts, ok, ...(latencyMs === undefined ? {} : { latencyMs }) };
+  }
+
+  listSourceHealth(sourceId: string, from: number, to: number): SourceHealthPoint[] {
+    const rows = this.db
+      .prepare(
+        `SELECT ts, ok, latency_ms FROM source_health
+         WHERE source_id = ? AND ts >= ? AND ts <= ? ORDER BY ts`,
+      )
+      .all(sourceId, from, to) as SourceHealthRow[];
+    return rows.map((row) => ({
+      ts: row.ts,
+      ok: row.ok === 1,
+      ...(row.latency_ms === null ? {} : { latencyMs: row.latency_ms }),
+    }));
   }
 
   getDeviceByMac(mac: string): DeviceRecord | undefined {
@@ -890,8 +978,8 @@ export class Store {
         INSERT INTO flows (
           id, source_id, device_id, ts, host, ip, port, proto, bytes_in, bytes_out,
           state, policy, policy_chain_json, policy_group, rule, process, process_path,
-          proxied, connect_ms, country, city, lat, lon, started_at, ended_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          proxied, connect_ms, country, asn, as_org, rdns, city, lat, lon, started_at, ended_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
           source_id = excluded.source_id,
           device_id = excluded.device_id,
@@ -912,6 +1000,9 @@ export class Store {
           proxied = excluded.proxied,
           connect_ms = excluded.connect_ms,
           country = excluded.country,
+          asn = COALESCE(excluded.asn, flows.asn),
+          as_org = COALESCE(excluded.as_org, flows.as_org),
+          rdns = COALESCE(excluded.rdns, flows.rdns),
           city = excluded.city,
           lat = excluded.lat,
           lon = excluded.lon,
@@ -942,6 +1033,9 @@ export class Store {
           flow.proxied === undefined ? null : flow.proxied ? 1 : 0,
           flow.connectMs ?? null,
           flow.country ?? null,
+          flow.asn ?? null,
+          flow.asOrg ?? null,
+          flow.rdns ?? null,
           flow.city ?? null,
           flow.lat ?? null,
           flow.lon ?? null,
@@ -1006,6 +1100,10 @@ export class Store {
       }
     });
     transaction(batch);
+  }
+
+  updateFlowRdns(id: string, rdns: string): boolean {
+    return this.db.prepare('UPDATE flows SET rdns = ? WHERE id = ?').run(rdns, id).changes > 0;
   }
 
   getOverview(now: number = this.now()): OverviewData {
@@ -1321,7 +1419,7 @@ export class Store {
         `SELECT f.id, f.ts, f.device_id, d.name AS device_name, f.host, f.ip, f.port, f.proto,
                 f.bytes_in, f.bytes_out, f.state, f.policy, f.policy_chain_json, f.rule,
                 f.process, f.country, f.started_at, f.ended_at, f.policy_group, f.process_path,
-                f.proxied, f.connect_ms, f.city, f.lat, f.lon
+                f.proxied, f.connect_ms, f.asn, f.as_org, f.rdns, f.city, f.lat, f.lon
          FROM flows f JOIN devices d ON d.id = f.device_id
          ${where}
          ORDER BY f.ts DESC, f.id DESC LIMIT ?`,
@@ -1343,8 +1441,9 @@ export class Store {
     minutes: number,
     limit: number,
     now: number = this.now(),
+    window?: ExplicitWindow,
   ): BreakdownRow[] {
-    const { start, end, table } = rollupWindow(minutes, now);
+    const { start, end, table } = rollupWindow(minutes, now, window);
     const scope = dimension === 'host' ? 'device_host' : 'device_country';
     const rows = this.db
       .prepare(
@@ -1371,16 +1470,21 @@ export class Store {
     minutes: number,
     limit: number,
     now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
   ): Array<{ policy: string; bytes: number }> {
-    const window = retainedFlowWindow(minutes, now);
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
     return this.flowBreakdownRows('policy', window, limit, {
       deviceId,
       omitNull: true,
     }).map((row) => ({ policy: row.key, bytes: row.bytesIn + row.bytesOut }));
   }
 
-  listCities(minutes: number, now: number = this.now()): CityPoint[] {
-    const window = retainedFlowWindow(minutes, now);
+  listCities(
+    minutes: number,
+    now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
+  ): CityPoint[] {
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
     const rows = this.db
       .prepare(
         `SELECT f.city, f.country, AVG(f.lat) AS lat, AVG(f.lon) AS lon,
@@ -1404,8 +1508,13 @@ export class Store {
     }));
   }
 
-  hostDetail(host: string, minutes: number, now: number = this.now()): HostDetailDto {
-    const window = retainedFlowWindow(minutes, now);
+  hostDetail(
+    host: string,
+    minutes: number,
+    now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
+  ): HostDetailDto {
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
     const filters = { host };
     const country = this.flowBreakdownRows('country', window, 1, {
       ...filters,
@@ -1414,24 +1523,34 @@ export class Store {
     return {
       host,
       ...(country === undefined ? {} : { country }),
-      series: this.timeseries(`host:${host}`, minutes, now),
+      series: this.timeseries(`host:${host}`, minutes, now, explicitWindow),
       devices: this.flowBreakdownRows('device', window, 8, filters),
       processes: this.flowBreakdownRows('process', window, 8, filters),
       ports: this.flowBreakdownRows('port', window, 8, filters),
-      recentFlows: this.listFlowPage({ host, limit: 15 }).flows,
+      recentFlows: this.listFlowPage({ host, limit: 15, ...explicitWindow }).flows,
     };
   }
 
-  dnsSummary(minutes: number, now: number = this.now()): DnsSummaryDto {
+  dnsSummary(
+    minutes: number,
+    now: number = this.now(),
+    window?: ExplicitWindow,
+  ): DnsSummaryDto {
     const retainedMinutes = DNS_LOG_RETENTION_MS / MINUTE_MS;
-    const { resolution, points, start } = rollupWindow(Math.min(minutes, retainedMinutes), now);
+    const { resolution, points, start } = rollupWindow(
+      window === undefined ? Math.min(minutes, retainedMinutes) : minutes,
+      now,
+      window,
+    );
+    const queryFrom = window?.from ?? start;
+    const queryTo = window?.to ?? now;
     const bucketRows = this.db
       .prepare(
         `SELECT CAST(ts / ? AS INTEGER) * ? AS bucket, COUNT(*) AS count
          FROM dns_log WHERE ts >= ? AND ts <= ?
          GROUP BY bucket ORDER BY bucket`,
       )
-      .all(resolution, resolution, start, now) as DnsBucketRow[];
+      .all(resolution, resolution, queryFrom, queryTo) as DnsBucketRow[];
     const counts = new Map(bucketRows.map((row) => [row.bucket, row.count]));
     const series = Array.from({ length: points }, (_, index) => {
       const ts = start + index * resolution;
@@ -1443,10 +1562,10 @@ export class Store {
          WHERE ts >= ? AND ts <= ?
          GROUP BY qname ORDER BY count DESC, qname LIMIT 10`,
       )
-      .all(start, now) as DnsSummaryDto['topDomains'];
+      .all(queryFrom, queryTo) as DnsSummaryDto['topDomains'];
     const answerRows = this.db
       .prepare('SELECT answers_json, rtt_ms FROM dns_log WHERE ts >= ? AND ts <= ?')
-      .all(start, now) as DnsAnswerRow[];
+      .all(queryFrom, queryTo) as DnsAnswerRow[];
     const rttBuckets: DnsSummaryDto['rttBuckets'] = [
       { label: '<10ms', count: 0 },
       { label: '10-50ms', count: 0 },
@@ -1470,7 +1589,7 @@ export class Store {
          WHERE ts >= ? AND ts <= ? AND server IS NOT NULL AND trim(server) <> ''
          GROUP BY server ORDER BY count DESC, server LIMIT 6`,
       )
-      .all(start, now) as DnsSummaryDto['resolvers'];
+      .all(queryFrom, queryTo) as DnsSummaryDto['resolvers'];
     return {
       series,
       topDomains,
@@ -1481,8 +1600,13 @@ export class Store {
     };
   }
 
-  timeseries(scope: TimeseriesScope, minutes: number, now: number = this.now()): TimeseriesPoint[] {
-    const { resolution, points, start, end, table } = rollupWindow(minutes, now);
+  timeseries(
+    scope: TimeseriesScope,
+    minutes: number,
+    now: number = this.now(),
+    window?: ExplicitWindow,
+  ): TimeseriesPoint[] {
+    const { resolution, points, start, end, table } = rollupWindow(minutes, now, window);
     const separator = scope.indexOf(':');
     const [scopeName, key] =
       separator === -1 ? [scope, ''] : [scope.slice(0, separator), scope.slice(separator + 1)];
@@ -1506,8 +1630,9 @@ export class Store {
     minutes: number,
     limit: number,
     now: number = this.now(),
+    window?: ExplicitWindow,
   ): MultiSeriesDto[] {
-    const { resolution, points, start, end, table } = rollupWindow(minutes, now);
+    const { resolution, points, start, end, table } = rollupWindow(minutes, now, window);
     const rows = this.db
       .prepare(
         `SELECT bucket, key, bytes_in, bytes_out FROM ${table}
@@ -1566,8 +1691,9 @@ export class Store {
     deviceId: string | undefined,
     limit: number,
     now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
   ): BreakdownDto {
-    const window = retainedFlowWindow(minutes, now);
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
     const deviceClause = deviceId === undefined ? '' : ' AND f.device_id = ?';
     const params: Array<string | number> = [window.from, window.to];
     if (deviceId !== undefined) params.push(deviceId);
@@ -1575,7 +1701,7 @@ export class Store {
     if (dim === 'domain') {
       const rows = this.db
         .prepare(
-          `SELECT f.host, f.device_id, SUM(f.bytes_in) AS bytes_in,
+          `SELECT f.host, f.device_id, MAX(f.country) AS country, SUM(f.bytes_in) AS bytes_in,
                   SUM(f.bytes_out) AS bytes_out, COUNT(*) AS flows, MIN(f.ts) AS first_ts
            FROM flows f
            WHERE f.ts >= ? AND f.ts <= ? AND f.host IS NOT NULL${deviceClause}
@@ -1584,20 +1710,42 @@ export class Store {
         .all(...params) as DomainSqlRow[];
       const merged = new Map<
         string,
-        { bytesIn: number; bytesOut: number; flows: number; devices: Set<string> }
+        {
+          bytesIn: number;
+          bytesOut: number;
+          flows: number;
+          devices: Set<string>;
+          country?: string;
+          countryBytes: number;
+        }
       >();
       for (const row of rows) {
         const key = registrableHost(row.host);
         if (!key) continue;
-        const value = merged.get(key) ?? { bytesIn: 0, bytesOut: 0, flows: 0, devices: new Set() };
+        const value =
+          merged.get(key) ??
+          ({ bytesIn: 0, bytesOut: 0, flows: 0, devices: new Set(), countryBytes: 0 } as {
+            bytesIn: number;
+            bytesOut: number;
+            flows: number;
+            devices: Set<string>;
+            country?: string;
+            countryBytes: number;
+          });
         value.bytesIn += row.bytes_in;
         value.bytesOut += row.bytes_out;
         value.flows += row.flows;
         value.devices.add(row.device_id);
+        const rowBytes = row.bytes_in + row.bytes_out;
+        if (row.country !== null && rowBytes > value.countryBytes) {
+          value.country = row.country;
+          value.countryBytes = rowBytes;
+        }
         merged.set(key, value);
       }
       const output = [...merged].map(([key, value]) => ({
         key,
+        ...(value.country === undefined ? {} : { country: value.country }),
         bytesIn: value.bytesIn,
         bytesOut: value.bytesOut,
         flows: value.flows,
@@ -1627,11 +1775,22 @@ export class Store {
       policy: 'f.policy',
       country: 'f.country',
       host: 'f.host',
+      ip: 'f.ip',
+      asn: 'f.asn',
     };
     const rawColumn = rawColumns[dim];
     const canBeUnknown = dim === 'policy' || dim === 'country';
     const column = canBeUnknown && !filters.omitNull ? `COALESCE(${rawColumn}, 'unknown')` : rawColumn;
-    const deviceLabel = dim === 'device' ? ', d.name AS label' : '';
+    const labelExpression =
+      dim === 'device'
+        ? 'd.name'
+        : dim === 'asn'
+          ? 'MAX(f.as_org)'
+          : dim === 'ip'
+            ? 'MAX(COALESCE(f.rdns, f.as_org))'
+            : undefined;
+    const labelSelect = labelExpression === undefined ? '' : `, ${labelExpression} AS label`;
+    const countrySelect = dim === 'country' ? '' : ', MAX(f.country) AS country';
     const deviceJoin = dim === 'device' ? 'LEFT JOIN devices d ON d.id = f.device_id' : '';
     const deviceGroup = dim === 'device' ? ', d.name' : '';
     const clauses = ['f.ts >= ?', 'f.ts <= ?'];
@@ -1644,6 +1803,7 @@ export class Store {
       clauses.push("(f.host = ? OR f.host LIKE '%.' || ?)");
       params.push(filters.host, filters.host);
     }
+    if (dim === 'ip') clauses.push("(f.host IS NULL OR f.host = '')");
     if (filters.omitNull) {
       clauses.push(`${rawColumn} IS NOT NULL`, `trim(CAST(${rawColumn} AS TEXT)) <> ''`);
     } else if (!canBeUnknown) {
@@ -1652,7 +1812,7 @@ export class Store {
     }
     const rows = this.db
       .prepare(
-        `SELECT ${column} AS key${deviceLabel}, SUM(f.bytes_in) AS bytes_in, SUM(f.bytes_out) AS bytes_out,
+        `SELECT ${column} AS key${labelSelect}${countrySelect}, SUM(f.bytes_in) AS bytes_in, SUM(f.bytes_out) AS bytes_out,
                 COUNT(*) AS flows, COUNT(DISTINCT f.device_id) AS devices
          FROM flows f ${deviceJoin}
          WHERE ${clauses.join(' AND ')}
@@ -1663,10 +1823,16 @@ export class Store {
       .all(...params, limit) as BreakdownSqlRow[];
     return rows.map((row) => {
       const key = String(row.key);
+      const label =
+        dim === 'device'
+          ? (row.label ?? 'Unknown device')
+          : key === 'unknown' && canBeUnknown
+            ? 'Unknown'
+            : (row.label ?? undefined);
       return {
         key,
-        ...(dim === 'device' ? { label: row.label ?? 'Unknown device' } : {}),
-        ...(key === 'unknown' && canBeUnknown ? { label: 'Unknown' } : {}),
+        ...(label === undefined ? {} : { label }),
+        ...(row.country == null || dim === 'country' ? {} : { country: row.country }),
         bytesIn: row.bytes_in,
         bytesOut: row.bytes_out,
         flows: row.flows,
@@ -1675,8 +1841,13 @@ export class Store {
     });
   }
 
-  sankey(minutes: number, limit: number, now: number = this.now()): SankeyDto {
-    const window = retainedFlowWindow(minutes, now);
+  sankey(
+    minutes: number,
+    limit: number,
+    now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
+  ): SankeyDto {
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
     const rows = this.db
       .prepare(
         `SELECT f.device_id, d.name AS device_name, f.policy, f.country,
@@ -1766,6 +1937,87 @@ export class Store {
     return { nodes, links };
   }
 
+  decisionChains(
+    minutes: number,
+    limit: number,
+    now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
+  ): SankeyDto {
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
+    const rows = this.db
+      .prepare(
+        `SELECT ts, bytes_in + bytes_out AS bytes, policy_chain_json, rule, policy_group, policy
+         FROM flows
+         WHERE ts >= ? AND ts <= ?
+           AND (policy_chain_json IS NOT NULL OR (policy IS NOT NULL AND (rule IS NOT NULL OR policy_group IS NOT NULL)))
+         ORDER BY ts DESC
+         LIMIT 20000`,
+      )
+      .all(window.from, window.to) as ChainFlowRow[];
+    const paths = new Map<string, { hops: string[]; bytes: number }>();
+    for (const row of rows) {
+      let hops: string[] | undefined;
+      if (row.policy_chain_json !== null) {
+        try {
+          const value: unknown = JSON.parse(row.policy_chain_json);
+          if (Array.isArray(value) && value.length >= 2 && value.every((hop) => typeof hop === 'string')) {
+            hops = value;
+          }
+        } catch {}
+      }
+      if (hops === undefined) {
+        const derived: string[] = [];
+        if (row.rule !== null && row.rule !== '') derived.push(row.rule);
+        if (row.policy_group !== null && row.policy_group !== '') derived.push(row.policy_group);
+        if (row.policy !== null && row.policy !== '' && row.policy !== row.policy_group) {
+          derived.push(row.policy);
+        }
+        if (derived.length < 2) continue;
+        hops = derived;
+      }
+      const key = JSON.stringify(hops);
+      const path = paths.get(key);
+      if (path === undefined) paths.set(key, { hops, bytes: row.bytes });
+      else path.bytes += row.bytes;
+    }
+
+    const selected = [...paths.entries()]
+      .filter(([, path]) => path.bytes > 0)
+      .sort((left, right) => right[1].bytes - left[1].bytes || left[0].localeCompare(right[0]))
+      .slice(0, limit)
+      .map(([, path]) => path);
+    const nodes: SankeyDto['nodes'] = [];
+    const indexes = new Map<string, number>();
+    const linksByPair = new Map<string, number>();
+    for (const path of selected) {
+      for (const hop of path.hops) {
+        if (indexes.has(hop)) continue;
+        indexes.set(hop, nodes.length);
+        nodes.push({ id: `policy:key:${hop}`, label: hop, kind: 'policy' });
+      }
+      const pathPairs = new Set<string>();
+      for (let index = 0; index < path.hops.length - 1; index += 1) {
+        const sourceName = path.hops[index];
+        const targetName = path.hops[index + 1];
+        if (sourceName === undefined || targetName === undefined || sourceName === targetName) continue;
+        const pair = `${sourceName}\u0000${targetName}`;
+        if (pathPairs.has(pair)) continue;
+        pathPairs.add(pair);
+        linksByPair.set(pair, (linksByPair.get(pair) ?? 0) + path.bytes);
+      }
+    }
+    const links: SankeyDto['links'] = [];
+    for (const [pair, bytes] of linksByPair) {
+      if (bytes <= 0) continue;
+      const [sourceName, targetName] = pair.split('\u0000');
+      if (sourceName === undefined || targetName === undefined) continue;
+      const source = indexes.get(sourceName);
+      const target = indexes.get(targetName);
+      if (source !== undefined && target !== undefined) links.push({ source, target, bytes });
+    }
+    return { nodes, links };
+  }
+
   punchcard(days: number, now: number = this.now()): PunchcardDto {
     const rows = this.db
       .prepare(
@@ -1808,10 +2060,20 @@ export class Store {
     });
   }
 
-  movers(minutes: number, now: number = this.now()): MoversDto {
-    const table = minutes <= 2_880 ? 'rollup_minute' : 'rollup_hour';
-    const currentFrom = now - minutes * MINUTE_MS;
-    const previousFrom = now - 2 * minutes * MINUTE_MS;
+  movers(
+    minutes: number,
+    now: number = this.now(),
+    window?: ExplicitWindow,
+  ): MoversDto {
+    const rollup = rollupWindow(minutes, now, window);
+    const table = rollup.table;
+    const span = window === undefined ? minutes * MINUTE_MS : window.to - window.from;
+    const currentFrom = window === undefined ? now - span : rollup.start;
+    const currentTo = window?.to ?? now;
+    const previousFrom =
+      window === undefined
+        ? now - 2 * span
+        : Math.floor((window.from - span) / rollup.resolution) * rollup.resolution;
     const query = (scope: 'device' | 'host'): MoverSqlRow[] => {
       const label = scope === 'device' ? 'd.name' : 'r.key';
       const join = scope === 'device' ? 'LEFT JOIN devices d ON d.id = r.key' : '';
@@ -1824,7 +2086,7 @@ export class Store {
            WHERE r.scope = ? AND r.bucket >= ? AND r.bucket <= ?
            GROUP BY r.key, ${label}`,
         )
-        .all(currentFrom, currentFrom, scope, previousFrom, now) as MoverSqlRow[];
+        .all(currentFrom, currentFrom, scope, previousFrom, currentTo) as MoverSqlRow[];
     };
     const mapRows = (rows: MoverSqlRow[]) =>
       rows
@@ -1892,9 +2154,14 @@ export class Store {
     };
   }
 
-  rejected(minutes: number, now: number = this.now()): RejectedSummaryDto {
-    const rollup = rollupWindow(minutes, now);
-    const seriesFrom = Math.max(rollup.start, now - FLOWS_RETENTION_MS);
+  rejected(
+    minutes: number,
+    now: number = this.now(),
+    explicitWindow?: ExplicitWindow,
+  ): RejectedSummaryDto {
+    const rollup = rollupWindow(minutes, now, explicitWindow);
+    const seriesFrom = Math.max(explicitWindow?.from ?? rollup.start, now - FLOWS_RETENTION_MS);
+    const seriesTo = explicitWindow?.to ?? now;
     const rejectedWhere = "(f.state = 'failed' OR upper(f.policy) LIKE 'REJECT%')";
     const bucketRows = this.db
       .prepare(
@@ -1903,13 +2170,13 @@ export class Store {
          WHERE f.ts >= ? AND f.ts <= ? AND ${rejectedWhere}
          GROUP BY bucket ORDER BY bucket`,
       )
-      .all(rollup.resolution, rollup.resolution, seriesFrom, now) as RejectedBucketRow[];
+      .all(rollup.resolution, rollup.resolution, seriesFrom, seriesTo) as RejectedBucketRow[];
     const byBucket = new Map(bucketRows.map((row) => [row.bucket, row.flows]));
     const series = Array.from({ length: rollup.points }, (_, index) => {
       const ts = rollup.start + index * rollup.resolution;
       return { ts, flows: byBucket.get(ts) ?? 0 };
     });
-    const window = retainedFlowWindow(minutes, now);
+    const window = retainedFlowWindow(minutes, now, explicitWindow);
     const topRows = (
       column: 'f.host' | 'f.device_id' | 'f.rule',
       includeDevices: boolean,
@@ -1943,6 +2210,16 @@ export class Store {
       topDevices: topRows('f.device_id', false, true),
       topRules: topRows('f.rule', false, false),
     };
+  }
+
+  countRejectedFlows(from: number, to: number): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM flows
+         WHERE ts >= ? AND ts <= ? AND (state = 'failed' OR upper(policy) LIKE 'REJECT%')`,
+      )
+      .get(from, to) as CountRow;
+    return row.count;
   }
 
   appendDnsLog(entry: Omit<DnsLogEntry, 'deviceName'>): DnsLogEntry {
@@ -2075,6 +2352,40 @@ export class Store {
     return rows.map(eventFromRow);
   }
 
+  getDatabaseInfo(): SystemDbDto {
+    const pageCount = this.db.pragma('page_count', { simple: true }) as number;
+    const pageSize = this.db.pragma('page_size', { simple: true }) as number;
+    const tableNames = [
+      'flows',
+      'rollup_minute',
+      'rollup_hour',
+      'dns_log',
+      'system_log',
+      'events',
+      'presence_log',
+      'source_health',
+      'devices',
+      'device_ips',
+    ] as const;
+    const tables = tableNames.map((name) => ({
+      name,
+      rows: this.db.prepare(`SELECT COUNT(*) FROM ${name}`).pluck().get() as number,
+    }));
+    return {
+      sizeBytes: pageCount * pageSize,
+      tables,
+      retention: [
+        { table: 'flows', days: FLOWS_RETENTION_MS / DAY_MS },
+        { table: 'rollup_minute', days: ROLLUP_MINUTE_RETENTION_MS / DAY_MS },
+        { table: 'rollup_hour', days: ROLLUP_HOUR_RETENTION_MS / DAY_MS },
+        { table: 'dns_log', days: DNS_LOG_RETENTION_MS / DAY_MS },
+        { table: 'system_log', days: SYSTEM_LOG_RETENTION_MS / DAY_MS },
+        { table: 'events', days: EVENTS_RETENTION_MS / DAY_MS },
+        { table: 'source_health', days: SOURCE_HEALTH_RETENTION_MS / DAY_MS },
+      ],
+    };
+  }
+
   sweepRetention(now: number = this.now()): {
     flows: number;
     rollupMinute: number;
@@ -2082,6 +2393,7 @@ export class Store {
     events: number;
     dnsLog: number;
     systemLog: number;
+    sourceHealth: number;
   } {
     const transaction = this.db.transaction(() => ({
       flows: this.db.prepare('DELETE FROM flows WHERE ts < ?').run(now - FLOWS_RETENTION_MS).changes,
@@ -2096,6 +2408,9 @@ export class Store {
       systemLog: this.db
         .prepare('DELETE FROM system_log WHERE ts < ?')
         .run(now - SYSTEM_LOG_RETENTION_MS).changes,
+      sourceHealth: this.db
+        .prepare('DELETE FROM source_health WHERE ts < ?')
+        .run(now - SOURCE_HEALTH_RETENTION_MS).changes,
     }));
     return transaction();
   }

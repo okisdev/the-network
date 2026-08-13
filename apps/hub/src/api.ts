@@ -1,15 +1,19 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import {
   surgeSettingsSchema,
+  type AuthStatusDto,
   type DeviceDetailDto,
   type FlowsQuery,
   type LogsQuery,
   type OverviewDto,
+  type SourceHealthPoint,
   type SourceDto,
   type SourceInput,
+  type SystemDbDto,
   type TimeseriesQuery,
 } from '@the-network/schema';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -18,7 +22,7 @@ import type { HubConfig } from './config.ts';
 import { Pipeline } from './pipeline.ts';
 import { ProbeManager } from './probes.ts';
 import { Realtime } from './realtime.ts';
-import type { SourceRecord } from './store.ts';
+import type { ExplicitWindow, SourceRecord } from './store.ts';
 import { Store } from './store.ts';
 
 const sourceInputSchema = z.object({
@@ -52,6 +56,35 @@ const flowsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
+const windowFields = {
+  from: z.coerce.number().int().optional(),
+  to: z.coerce.number().int().optional(),
+};
+
+function validateWindow(
+  value: { from?: number; to?: number },
+  context: z.RefinementCtx,
+): void {
+  if ((value.from === undefined) !== (value.to === undefined)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'from and to must be provided together',
+    });
+  } else if (value.from !== undefined && value.to !== undefined && value.to <= value.from) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'to must be greater than from',
+      path: ['to'],
+    });
+  }
+}
+
+function explicitWindow(value: { from?: number; to?: number }): ExplicitWindow | undefined {
+  return value.from === undefined || value.to === undefined
+    ? undefined
+    : { from: value.from, to: value.to };
+}
+
 const logsQuerySchema = z.object({
   search: z.string().optional(),
   level: z.enum(['info', 'warn', 'error']).optional(),
@@ -59,42 +92,66 @@ const logsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
-const timeseriesQuerySchema = z.object({
-  scope: z
-    .string()
-    .refine(
-      (value): value is TimeseriesQuery['scope'] =>
-        value === 'wan' ||
-        ['device:', 'policy:', 'host:', 'country:'].some((prefix) => value.startsWith(prefix)),
-    ),
-  minutes: z.coerce.number().int().min(1).max(525_600),
-});
+const timeseriesQuerySchema = z
+  .object({
+    scope: z
+      .string()
+      .refine(
+        (value): value is TimeseriesQuery['scope'] =>
+          value === 'wan' ||
+          ['device:', 'policy:', 'host:', 'country:'].some((prefix) => value.startsWith(prefix)),
+      ),
+    minutes: z.coerce.number().int().min(1).max(525_600),
+    ...windowFields,
+  })
+  .superRefine(validateWindow);
 
 const minutesSchema = z.coerce.number().int().min(1).max(525_600);
 
-const minutesQuerySchema = z.object({ minutes: minutesSchema });
+const minutesQuerySchema = z
+  .object({ minutes: minutesSchema, ...windowFields })
+  .superRefine(validateWindow);
 
 const deviceDetailParamsSchema = z.object({ id: z.string().min(1) });
 
 const hostDetailParamsSchema = z.object({ host: z.string().trim().min(1) });
 
-const multiTimeseriesQuerySchema = z.object({
-  scope: z.enum(['device', 'policy']),
-  minutes: minutesSchema,
-  limit: z.coerce.number().int().min(1).max(12).default(5),
-});
+const sourceHealthParamsSchema = z.object({ id: z.string().min(1) });
 
-const breakdownQuerySchema = z.object({
-  dim: z.enum(['process', 'port', 'proto', 'rule', 'policy', 'country', 'host', 'domain']),
-  minutes: minutesSchema,
-  deviceId: z.string().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(50).default(12),
-});
+const multiTimeseriesQuerySchema = z
+  .object({
+    scope: z.enum(['device', 'policy']),
+    minutes: minutesSchema,
+    limit: z.coerce.number().int().min(1).max(12).default(5),
+    ...windowFields,
+  })
+  .superRefine(validateWindow);
 
-const sankeyQuerySchema = z.object({
-  minutes: minutesSchema,
-  limit: z.coerce.number().int().min(1).max(12).default(8),
-});
+const breakdownQuerySchema = z
+  .object({
+    dim: z.enum(['process', 'port', 'proto', 'rule', 'policy', 'country', 'host', 'domain', 'ip', 'asn']),
+    minutes: minutesSchema,
+    deviceId: z.string().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(12),
+    ...windowFields,
+  })
+  .superRefine(validateWindow);
+
+const sankeyQuerySchema = z
+  .object({
+    minutes: minutesSchema,
+    limit: z.coerce.number().int().min(1).max(12).default(8),
+    ...windowFields,
+  })
+  .superRefine(validateWindow);
+
+const chainsQuerySchema = z
+  .object({
+    minutes: minutesSchema,
+    limit: z.coerce.number().int().min(1).max(30).default(12),
+    ...windowFields,
+  })
+  .superRefine(validateWindow);
 
 const punchcardQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(90).default(28),
@@ -104,20 +161,86 @@ const dailyQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(60).default(30),
 });
 
-const moversQuerySchema = z.object({ minutes: minutesSchema });
+const moversQuerySchema = z
+  .object({ minutes: minutesSchema, ...windowFields })
+  .superRefine(validateWindow);
 
 const firstSeenQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(30).default(7),
 });
 
-const rejectedQuerySchema = z.object({ minutes: minutesSchema });
+const rejectedQuerySchema = z
+  .object({ minutes: minutesSchema, ...windowFields })
+  .superRefine(validateWindow);
+
+const loginBodySchema = z.object({ token: z.string() });
+
+const hostnamePattern = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$/i;
+const faviconParamsSchema = z.object({ domain: z.string().regex(hostnamePattern) });
+
+const SESSION_COOKIE = 'tn_session';
+const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+const FAVICON_FRESH_MS = 7 * 24 * 60 * 60 * 1_000;
+const FAVICON_NEGATIVE_MS = 60 * 60 * 1_000;
+const FAVICON_TIMEOUT_MS = 4_000;
+
+function parseCookies(header: string | undefined): Map<string, string> {
+  const cookies = new Map<string, string>();
+  for (const part of header?.split(';') ?? []) {
+    const separator = part.indexOf('=');
+    if (separator === -1) continue;
+    cookies.set(part.slice(0, separator).trim(), part.slice(separator + 1).trim());
+  }
+  return cookies;
+}
+
+function tokenDigest(token: string): Buffer {
+  return createHash('sha256').update(token).digest();
+}
+
+function tokensEqual(left: string, right: string): boolean {
+  return timingSafeEqual(tokenDigest(left), tokenDigest(right));
+}
+
+function sessionSignature(expires: string, key: Buffer): Buffer {
+  return createHmac('sha256', key).update(`tn|${expires}`).digest();
+}
+
+function createSessionCookie(authToken: string): string {
+  const expires = String(Date.now() + SESSION_MAX_AGE_SECONDS * 1_000);
+  const signature = sessionSignature(expires, tokenDigest(authToken)).toString('hex');
+  return `${SESSION_COOKIE}=${expires}.${signature}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}`;
+}
+
+function validSession(value: string | undefined, authToken: string): boolean {
+  if (value === undefined) return false;
+  const match = /^(\d+)\.([0-9a-f]{64})$/.exec(value);
+  if (match === null) return false;
+  const [, expires, signature] = match;
+  if (expires === undefined || signature === undefined || Number(expires) <= Date.now()) return false;
+  return timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    sessionSignature(expires, tokenDigest(authToken)),
+  );
+}
+
+function validCredentials(
+  cookieHeader: string | undefined,
+  authorization: string | undefined,
+  authToken: string,
+): boolean {
+  const session = parseCookies(cookieHeader).get(SESSION_COOKIE);
+  if (validSession(session, authToken)) return true;
+  return authorization?.startsWith('Bearer ') === true && tokensEqual(authorization.slice(7), authToken);
+}
 
 export interface ApiOptions {
-  config: Pick<HubConfig, 'consoleDist'>;
+  config: Pick<HubConfig, 'consoleDist' | 'authToken' | 'dataDir' | 'faviconsEnabled'>;
   store: Store;
   pipeline: Pipeline;
   probes: ProbeManager;
   realtime: Realtime;
+  fetch?: typeof fetch;
 }
 
 function parseSettings(kind: string, settings: Record<string, unknown>): Record<string, unknown> {
@@ -153,6 +276,10 @@ function sourceDto(source: SourceRecord, probes: ProbeManager): SourceDto {
 export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   const { store, pipeline, probes, realtime } = options;
+  const authToken = options.config.authToken;
+  const fetchFavicon = options.fetch ?? globalThis.fetch;
+  const faviconDir = join(options.config.dataDir, 'favicons');
+  const faviconMisses = new Map<string, number>();
 
   app.setErrorHandler((error, _request, reply) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -162,7 +289,87 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
     return reply.code(500).send({ message });
   });
 
+  app.addHook('preHandler', async (request, reply) => {
+    if (
+      authToken === undefined ||
+      !request.url.startsWith('/api/') ||
+      request.url.startsWith('/api/auth/')
+    ) {
+      return;
+    }
+    if (validCredentials(request.headers.cookie, request.headers.authorization, authToken)) return;
+    return reply.code(401).send({ message: 'Unauthorized' });
+  });
+
   app.get('/health', async () => ({ ok: true as const }));
+
+  app.get<{ Params: { domain: string } }>('/api/favicon/:domain', async (request, reply) => {
+    const { domain: inputDomain } = faviconParamsSchema.parse(request.params);
+    if (!options.config.faviconsEnabled) return reply.code(404).send({ message: 'Not found' });
+    const domain = inputDomain.toLowerCase();
+    const now = Date.now();
+    if ((faviconMisses.get(domain) ?? 0) > now) {
+      return reply.code(404).send({ message: 'Not found' });
+    }
+
+    const cachePath = join(faviconDir, `${domain}.ico`);
+    try {
+      const cacheStat = await stat(cachePath);
+      if (now - cacheStat.mtimeMs < FAVICON_FRESH_MS) {
+        const icon = await readFile(cachePath);
+        return reply
+          .type('image/x-icon')
+          .header('cache-control', 'public,max-age=86400')
+          .send(icon);
+      }
+    } catch {}
+
+    try {
+      const response = await fetchFavicon(`https://icons.duckduckgo.com/ip3/${domain}.ico`, {
+        signal: AbortSignal.timeout(FAVICON_TIMEOUT_MS),
+      });
+      const contentType = response.headers.get('content-type') ?? '';
+      if (response.status !== 200 || !/^image\//i.test(contentType)) {
+        throw new Error(`Invalid favicon response: HTTP ${response.status}`);
+      }
+      const icon = Buffer.from(await response.arrayBuffer());
+      await mkdir(faviconDir, { recursive: true });
+      await writeFile(cachePath, icon);
+      faviconMisses.delete(domain);
+      return reply
+        .type('image/x-icon')
+        .header('cache-control', 'public,max-age=86400')
+        .send(icon);
+    } catch {
+      faviconMisses.set(domain, now + FAVICON_NEGATIVE_MS);
+      return reply.code(404).send({ message: 'Not found' });
+    }
+  });
+
+  app.get('/api/auth/status', async (request): Promise<AuthStatusDto> => ({
+    enabled: authToken !== undefined,
+    authenticated:
+      authToken !== undefined &&
+      validCredentials(request.headers.cookie, request.headers.authorization, authToken),
+  }));
+
+  app.post('/api/auth/login', async (request, reply): Promise<AuthStatusDto> => {
+    const { token } = loginBodySchema.parse(request.body);
+    if (authToken === undefined) return { enabled: false, authenticated: true };
+    if (!tokensEqual(token, authToken)) {
+      return reply.code(401).send({ message: 'Invalid token' });
+    }
+    reply.header('set-cookie', createSessionCookie(authToken));
+    return { enabled: true, authenticated: true };
+  });
+
+  app.post('/api/auth/logout', async (_request, reply) => {
+    reply.header(
+      'set-cookie',
+      `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+    );
+    return { ok: true as const };
+  });
 
   app.get('/api/overview', async (): Promise<OverviewDto> => {
     const now = Date.now();
@@ -189,11 +396,15 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
     };
   });
 
+  app.get('/api/system/db', async (): Promise<SystemDbDto> => store.getDatabaseInfo());
+
   app.get('/api/devices', async () => store.listDeviceDtos(pipeline.deviceRates()));
 
   app.get<{ Params: { id: string } }>('/api/devices/:id/detail', async (request, reply) => {
     const { id } = deviceDetailParamsSchema.parse(request.params);
-    const { minutes } = minutesQuerySchema.parse(request.query);
+    const query = minutesQuerySchema.parse(request.query);
+    const window = explicitWindow(query);
+    const { minutes } = query;
     const now = Date.now();
     const device = store
       .listDeviceDtos(pipeline.deviceRates(now), now)
@@ -201,14 +412,14 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
     if (device === undefined) return reply.code(404).send({ message: 'Device not found' });
     const detail: DeviceDetailDto = {
       device,
-      series: store.timeseries(`device:${id}`, minutes, now),
-      topHosts: store.deviceRollupBreakdown(id, 'host', minutes, 10, now),
-      topCountries: store.deviceRollupBreakdown(id, 'country', minutes, 8, now),
-      topProcesses: store.breakdown('process', minutes, id, 8, now).rows,
-      topPorts: store.breakdown('port', minutes, id, 8, now).rows,
-      policySplit: store.devicePolicySplit(id, minutes, 6, now),
-      presence: store.listPresence(id, now - minutes * 60_000, now),
-      recentFlows: store.listFlows({ deviceId: id, limit: 15 }).flows,
+      series: store.timeseries(`device:${id}`, minutes, now, window),
+      topHosts: store.deviceRollupBreakdown(id, 'host', minutes, 10, now, window),
+      topCountries: store.deviceRollupBreakdown(id, 'country', minutes, 8, now, window),
+      topProcesses: store.breakdown('process', minutes, id, 8, now, window).rows,
+      topPorts: store.breakdown('port', minutes, id, 8, now, window).rows,
+      policySplit: store.devicePolicySplit(id, minutes, 6, now, window),
+      presence: store.listPresence(id, window?.from ?? now - minutes * 60_000, window?.to ?? now),
+      recentFlows: store.listFlows({ deviceId: id, limit: 15, ...window }).flows,
     };
     return detail;
   });
@@ -230,7 +441,7 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/destinations/cities', async (request) => {
     const query = minutesQuerySchema.parse(request.query);
-    return store.listCities(query.minutes);
+    return store.listCities(query.minutes, undefined, explicitWindow(query));
   });
 
   app.get<{ Params: { code: string } }>('/api/destinations/:code/devices', async (request) =>
@@ -244,13 +455,13 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/dns/summary', async (request) => {
     const query = minutesQuerySchema.parse(request.query);
-    return store.dnsSummary(query.minutes);
+    return store.dnsSummary(query.minutes, undefined, explicitWindow(query));
   });
 
   app.get<{ Params: { host: string } }>('/api/hosts/:host', async (request) => {
     const { host } = hostDetailParamsSchema.parse(request.params);
-    const { minutes } = minutesQuerySchema.parse(request.query);
-    return store.hostDetail(host, minutes);
+    const query = minutesQuerySchema.parse(request.query);
+    return store.hostDetail(host, query.minutes, undefined, explicitWindow(query));
   });
 
   app.get('/api/logs/system', async (request) => {
@@ -260,22 +471,40 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/timeseries', async (request) => {
     const query = timeseriesQuerySchema.parse(request.query);
-    return store.timeseries(query.scope, query.minutes);
+    return store.timeseries(query.scope, query.minutes, undefined, explicitWindow(query));
   });
 
   app.get('/api/timeseries/multi', async (request) => {
     const query = multiTimeseriesQuerySchema.parse(request.query);
-    return store.multiTimeseries(query.scope, query.minutes, query.limit);
+    return store.multiTimeseries(
+      query.scope,
+      query.minutes,
+      query.limit,
+      undefined,
+      explicitWindow(query),
+    );
   });
 
   app.get('/api/breakdown', async (request) => {
     const query = breakdownQuerySchema.parse(request.query);
-    return store.breakdown(query.dim, query.minutes, query.deviceId, query.limit);
+    return store.breakdown(
+      query.dim,
+      query.minutes,
+      query.deviceId,
+      query.limit,
+      undefined,
+      explicitWindow(query),
+    );
   });
 
   app.get('/api/sankey', async (request) => {
     const query = sankeyQuerySchema.parse(request.query);
-    return store.sankey(query.minutes, query.limit);
+    return store.sankey(query.minutes, query.limit, undefined, explicitWindow(query));
+  });
+
+  app.get('/api/chains', async (request) => {
+    const query = chainsQuerySchema.parse(request.query);
+    return store.decisionChains(query.minutes, query.limit, undefined, explicitWindow(query));
   });
 
   app.get('/api/insights/punchcard', async (request) => {
@@ -290,7 +519,7 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/insights/movers', async (request) => {
     const query = moversQuerySchema.parse(request.query);
-    return store.movers(query.minutes);
+    return store.movers(query.minutes, undefined, explicitWindow(query));
   });
 
   app.get('/api/insights/firstseen', async (request) => {
@@ -300,10 +529,25 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
 
   app.get('/api/insights/rejected', async (request) => {
     const query = rejectedQuerySchema.parse(request.query);
-    return store.rejected(query.minutes);
+    return store.rejected(query.minutes, undefined, explicitWindow(query));
   });
 
   app.get('/api/sources', async () => store.listSources().map((source) => sourceDto(source, probes)));
+
+  app.get<{ Params: { id: string } }>('/api/sources/:id/health', async (request, reply) => {
+    const { id } = sourceHealthParamsSchema.parse(request.params);
+    if (store.getSource(id) === undefined) {
+      return reply.code(404).send({ message: 'Source not found' });
+    }
+    const query = minutesQuerySchema.parse(request.query);
+    const now = Date.now();
+    const window = explicitWindow(query);
+    return store.listSourceHealth(
+      id,
+      window?.from ?? now - query.minutes * 60_000,
+      window?.to ?? now,
+    ) satisfies SourceHealthPoint[];
+  });
 
   app.post('/api/sources', async (request, reply) => {
     const input = sourceInputSchema.parse(request.body) as SourceInput;

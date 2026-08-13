@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import { LoginScreen } from "@/components/auth/login-screen";
 import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthGate, AuthProvider } from "@/contexts/auth-provider";
 import { LiveProvider } from "@/contexts/live-provider";
 import { QueryProvider } from "@/contexts/query-provider";
 import { ThemeProvider } from "@/contexts/theme-provider";
@@ -27,6 +29,7 @@ export const metadata: Metadata = {
     default: "The Network",
   },
   description: "Home network observability",
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
@@ -46,11 +49,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-dvh overflow-x-clip text-sm">
         <ThemeProvider>
           <QueryProvider>
-            <LiveProvider>
-              <TimeRangeProvider>
-                <AppShell>{children}</AppShell>
-              </TimeRangeProvider>
-            </LiveProvider>
+            <AuthProvider>
+              <AuthGate loginScreen={<LoginScreen />}>
+                <LiveProvider>
+                  <TimeRangeProvider>
+                    <AppShell>{children}</AppShell>
+                  </TimeRangeProvider>
+                </LiveProvider>
+              </AuthGate>
+            </AuthProvider>
           </QueryProvider>
           <Toaster />
         </ThemeProvider>

@@ -63,6 +63,9 @@ export const surgeProbe: ProbeAdapter = {
         ctx.setStatus({
           state: 'ok',
           lastSuccessAt: Date.now(),
+          ...(client.lastLatencyMs !== undefined
+            ? { lastLatencyMs: client.lastLatencyMs }
+            : {}),
         });
       } catch (err) {
         requestFailures += 1;

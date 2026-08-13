@@ -10,7 +10,7 @@ import type {
   SankeyDto,
   TimeseriesPoint,
 } from "@the-network/schema";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,9 +22,11 @@ import { SankeyFlow } from "@/components/charts/sankey-flow";
 import { Sparkline } from "@/components/charts/sparkline";
 import { SplitBar } from "@/components/charts/split-bar";
 import { TreemapChart } from "@/components/charts/treemap-chart";
+import { ArrowLink } from "@/components/ui/arrow-link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CountryChip } from "@/components/ui/country-chip";
+import { DomainFavicon } from "@/components/ui/domain-favicon";
 import { Empty } from "@/components/ui/empty";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { PageHeader } from "@/components/ui/page-header";
@@ -38,8 +40,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
-import { TIME_RANGES, useTimeRange } from "@/contexts/timerange-provider";
-import { api } from "@/lib/api";
+import { useTimeRange } from "@/contexts/timerange-provider";
+import { api, type RangeQuery } from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
 import { formatBytes, formatTime } from "@/lib/format";
 import { registrableDomain, serviceForPort } from "@/lib/net-labels";
 import { useQueryParams } from "@/lib/use-query-params";
@@ -200,12 +203,12 @@ function CountriesPanel({
                     </span>
                   </div>
                 </button>
-                <Link
+                <ArrowLink
                   href={flowHref({ country: code })}
-                  className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center rounded-lg px-2 text-[11px] focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                  className="shrink-0 rounded-lg px-2 text-[11px] focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
                 >
-                  flows →
-                </Link>
+                  flows
+                </ArrowLink>
               </div>
             );
           })}
@@ -386,7 +389,7 @@ function DomainTable({
       </TableHead>
       <TableBody>
         {rows.map((row, index) => {
-          const country = dominantCountryForDomain(row.key, hosts);
+          const country = row.country ?? dominantCountryForDomain(row.key, hosts);
           const trend = trends[index];
           const points = Array.isArray(trend?.data)
             ? trend.data.map((point) => point.in + point.out)
@@ -402,8 +405,11 @@ function DomainTable({
               onKeyDown={(event) => activateRow(event, inspect)}
               className="hover:bg-muted focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
             >
-              <TableCell className="max-w-64 truncate font-mono text-[12px]" title={row.key}>
-                {row.key}
+              <TableCell className="max-w-64 font-mono text-[12px]" title={row.key}>
+                <span className="flex items-center gap-2">
+                  <DomainFavicon domain={row.key} />
+                  <span className="truncate">{row.key}</span>
+                </span>
               </TableCell>
               <TableCell>
                 {country ? (
@@ -447,21 +453,91 @@ function DomainTable({
   );
 }
 
+function DirectIpsTable({ rows, onSelect }: { rows: BreakdownRow[]; onSelect: (ip: string) => void }) {
+  if (rows.length === 0) return <Empty message="No direct-IP traffic in this range" />;
+  const maximum = Math.max(1, ...rows.map(breakdownBytes));
+
+  return (
+    <Table className="min-w-[620px]">
+      <TableHead>
+        <TableRow>
+          <TableHeader>IP</TableHeader>
+          <TableHeader>Country</TableHeader>
+          <TableHeader>Network</TableHeader>
+          <TableHeader className="text-right">Devices</TableHeader>
+          <TableHeader className="text-right">Flows</TableHeader>
+          <TableHeader className="w-52 text-right">Traffic</TableHeader>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {rows.map((row) => {
+          const select = () => onSelect(row.key);
+          return (
+            <TableRow
+              key={row.key}
+              role="button"
+              tabIndex={0}
+              aria-label={`View flows for ${row.key}`}
+              onClick={select}
+              onKeyDown={(event) => activateRow(event, select)}
+              className="hover:bg-muted focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <TableCell className="font-mono text-[12px]">{row.key}</TableCell>
+              <TableCell>
+                {row.country ? (
+                  <CountryChip code={row.country} />
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell className="max-w-64">
+                <span className="block truncate text-[12px]" title={row.label}>
+                  {row.label ?? "—"}
+                </span>
+              </TableCell>
+              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+                {row.devices ?? 0}
+              </TableCell>
+              <TableCell className="text-muted-foreground text-right font-mono text-[12px] tabular-nums">
+                {row.flows}
+              </TableCell>
+              <TableCell>
+                <div className="ml-auto w-40">
+                  <SplitBar inValue={row.bytesIn} outValue={row.bytesOut} max={maximum} />
+                  <div className="text-muted-foreground mt-1 text-right font-mono text-[11px] tabular-nums">
+                    {formatBytes(breakdownBytes(row))}
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
 function HostInspector({
   host,
-  minutes,
+  rangeQuery,
   fallbackCountry,
   onClose,
 }: {
   host: string | null;
-  minutes: number;
+  rangeQuery: RangeQuery;
   fallbackCountry?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["hostDetail", host, minutes],
-    queryFn: () => api.hostDetail(host!, minutes),
+    queryKey: [
+      "hostDetail",
+      host,
+      rangeQuery.minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+    ],
+    queryFn: () => api.hostDetail(host!, rangeQuery),
     enabled: Boolean(host),
     refetchInterval: 30000,
   });
@@ -472,7 +548,16 @@ function HostInspector({
     <InspectorPanel
       open={Boolean(host)}
       onClose={onClose}
-      title={host ?? "Domain"}
+      title={
+        host ? (
+          <span className="flex min-w-0 items-center gap-2">
+            <DomainFavicon key={host} domain={host} />
+            <span className="truncate">{host}</span>
+          </span>
+        ) : (
+          "Domain"
+        )
+      }
       sub={
         <span className="inline-flex items-center gap-1.5">
           {country ? <CountryChip code={country} /> : <span>—</span>}
@@ -548,7 +633,10 @@ function HostInspector({
               <Empty message="No port data yet" />
             )}
           </InspectorSection>
-          <InspectorSection title="Recent flows">
+          <InspectorSection
+            title="Recent flows"
+            action={<ArrowLink href={flowHref({ search: detail.host })}>All flows</ArrowLink>}
+          >
             {detail.recentFlows.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {detail.recentFlows.slice(0, 10).map((flow) => {
@@ -570,12 +658,6 @@ function HostInspector({
                     </div>
                   );
                 })}
-                <Link
-                  href={flowHref({ search: detail.host })}
-                  className="text-muted-foreground hover:text-foreground mt-1 inline-flex w-fit text-xs underline-offset-4 hover:underline"
-                >
-                  All flows →
-                </Link>
               </div>
             ) : (
               <Empty message="No recent flows yet" />
@@ -590,27 +672,42 @@ function HostInspector({
 function DomainsTab({
   hosts,
   host,
-  minutes,
+  rangeQuery,
   onSelect,
   onClose,
 }: {
   hosts: DestinationHost[];
   host: string | null;
-  minutes: number;
+  rangeQuery: RangeQuery;
   onSelect: (host: string) => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const { minutes } = rangeQuery;
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["breakdown", "domain", minutes, 40],
-    queryFn: () => api.breakdown({ dim: "domain", minutes, limit: 40 }),
+    queryKey: ["breakdown", "domain", minutes, rangeQuery.from, rangeQuery.to, 40],
+    queryFn: () => api.breakdown({ dim: "domain", limit: 40, ...rangeQuery }),
+    refetchInterval: 30000,
+  });
+  const { data: directIpData, isLoading: directIpsLoading } = useQuery({
+    queryKey: ["breakdown", "ip", minutes, rangeQuery.from, rangeQuery.to, 12],
+    queryFn: () => api.breakdown({ dim: "ip", limit: 12, ...rangeQuery }),
     refetchInterval: 30000,
   });
   const rows = Array.isArray(data?.rows) ? data.rows : [];
+  const directIpRows = Array.isArray(directIpData?.rows) ? directIpData.rows : [];
   const visibleRows = rows.slice(0, 15);
   const trends = useQueries({
     queries: visibleRows.map((row) => ({
-      queryKey: ["timeseries", "host", row.key, minutes],
-      queryFn: () => api.timeseries({ scope: `host:${row.key}`, minutes }),
+      queryKey: [
+        "timeseries",
+        "host",
+        row.key,
+        minutes,
+        rangeQuery.from,
+        rangeQuery.to,
+      ],
+      queryFn: () => api.timeseries({ scope: `host:${row.key}`, ...rangeQuery }),
       refetchInterval: 60000,
     })),
   });
@@ -638,7 +735,35 @@ function DomainsTab({
             />
           )}
         </Card>
-        <Card title="Top domains" className="col-span-12">
+        <Card
+          title="Top domains"
+          action={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={rows.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  `domains-${new Date().toISOString().slice(0, 16).replace(":", "")}.csv`,
+                  ["domain", "country", "devices", "flows", "bytes_in", "bytes_out"],
+                  rows.map((row) => [
+                    row.key,
+                    row.country ?? dominantCountryForDomain(row.key, hosts),
+                    row.devices,
+                    row.flows,
+                    row.bytesIn,
+                    row.bytesOut,
+                  ]),
+                )
+              }
+            >
+              <Download className="size-3.5" />
+              CSV
+            </Button>
+          }
+          className="col-span-12"
+        >
           {isLoading && !data ? (
             <Skeleton className="h-80 w-full" />
           ) : isError ? (
@@ -647,10 +772,23 @@ function DomainsTab({
             <DomainTable rows={visibleRows} hosts={hosts} trends={trends} onSelect={onSelect} />
           )}
         </Card>
+        <Card title="Direct IPs" className="col-span-12">
+          {directIpsLoading && !directIpData ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <DirectIpsTable
+              rows={directIpRows}
+              onSelect={(ip) => router.push(flowHref({ search: ip }))}
+            />
+          )}
+          <p className="text-muted-foreground mt-3 text-xs">
+            Connections that never presented a hostname
+          </p>
+        </Card>
       </div>
       <HostInspector
         host={host}
-        minutes={minutes}
+        rangeQuery={rangeQuery}
         fallbackCountry={fallbackCountry}
         onClose={onClose}
       />
@@ -664,15 +802,16 @@ function protocolColor(key: string): string {
   return "var(--color-chart-7)";
 }
 
-function PortsTab({ minutes }: { minutes: number }) {
+function PortsTab({ rangeQuery }: { rangeQuery: RangeQuery }) {
   const router = useRouter();
+  const { minutes } = rangeQuery;
   const {
     data: protocolData,
     isLoading: protocolsLoading,
     isError: protocolsError,
   } = useQuery({
-    queryKey: ["breakdown", "proto", minutes],
-    queryFn: () => api.breakdown({ dim: "proto", minutes }),
+    queryKey: ["breakdown", "proto", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.breakdown({ dim: "proto", ...rangeQuery }),
     refetchInterval: 30000,
   });
   const {
@@ -680,12 +819,22 @@ function PortsTab({ minutes }: { minutes: number }) {
     isLoading: portsLoading,
     isError: portsError,
   } = useQuery({
-    queryKey: ["breakdown", "port", minutes, 15],
-    queryFn: () => api.breakdown({ dim: "port", minutes, limit: 15 }),
+    queryKey: ["breakdown", "port", minutes, rangeQuery.from, rangeQuery.to, 15],
+    queryFn: () => api.breakdown({ dim: "port", limit: 15, ...rangeQuery }),
+    refetchInterval: 30000,
+  });
+  const {
+    data: networkData,
+    isLoading: networksLoading,
+    isError: networksError,
+  } = useQuery({
+    queryKey: ["breakdown", "asn", minutes, rangeQuery.from, rangeQuery.to, 12],
+    queryFn: () => api.breakdown({ dim: "asn", limit: 12, ...rangeQuery }),
     refetchInterval: 30000,
   });
   const protocolRows = Array.isArray(protocolData?.rows) ? protocolData.rows : [];
   const portRows = Array.isArray(portData?.rows) ? portData.rows : [];
+  const networkRows = Array.isArray(networkData?.rows) ? networkData.rows : [];
   const protocolTotal = protocolRows.reduce((sum, row) => sum + breakdownBytes(row), 0);
 
   return (
@@ -753,6 +902,24 @@ function PortsTab({ minutes }: { minutes: number }) {
           />
         )}
       </Card>
+      <Card title="Networks" className="col-span-12">
+        {networksLoading && !networkData ? (
+          <Skeleton className="h-72 w-full" />
+        ) : networksError ? (
+          <Empty message="Network breakdown is not available yet" />
+        ) : networkRows.length === 0 ? (
+          <Empty message="No AS data yet — run scripts/update-asn.mjs to fetch the offline database" />
+        ) : (
+          <BarsList
+            rows={networkRows.map((row) => ({
+              key: row.key,
+              label: row.label ?? `AS${row.key}`,
+              sub: `AS${row.key} · ${row.flows.toLocaleString()} flows · ${row.devices ?? 0} devices`,
+              value: breakdownBytes(row),
+            }))}
+          />
+        )}
+      </Card>
     </div>
   );
 }
@@ -774,50 +941,90 @@ function parseSankeyId(id: string): ParsedSankeyId | undefined {
   return { kind, value: id.slice(secondColon + 1) };
 }
 
-function FlowTab({ minutes, rangeLabel }: { minutes: number; rangeLabel: string }) {
+function FlowTab({ rangeQuery, rangeLabel }: { rangeQuery: RangeQuery; rangeLabel: string }) {
   const router = useRouter();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["sankey", minutes, 8],
-    queryFn: () => api.sankey({ minutes, limit: 8 }),
+    queryKey: [
+      "sankey",
+      rangeQuery.minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+      8,
+    ],
+    queryFn: () => api.sankey({ limit: 8, ...rangeQuery }),
     refetchInterval: 30000,
   });
   const sankey = data ?? EMPTY_SANKEY;
+  const {
+    data: chainsData,
+    isLoading: chainsLoading,
+    isError: chainsError,
+  } = useQuery({
+    queryKey: [
+      "chains",
+      rangeQuery.minutes,
+      rangeQuery.from,
+      rangeQuery.to,
+      12,
+    ],
+    queryFn: () => api.chains({ limit: 12, ...rangeQuery }),
+    refetchInterval: 30000,
+  });
+  const chains = chainsData ?? EMPTY_SANKEY;
 
   return (
-    <Card title="Traffic flow">
-      {isLoading && !data ? (
-        <Skeleton className="h-[420px] w-full" />
-      ) : isError ? (
-        <Empty message="Traffic flow is not available yet" />
-      ) : sankey.links.length === 0 ? (
-        <Empty message="No traffic flow yet" />
-      ) : (
-        <>
-          <SankeyFlow
-            data={sankey}
-            height={420}
-            onLink={(sourceId, targetId) => {
-              const source = parseSankeyId(sourceId);
-              const target = parseSankeyId(targetId);
-              let href: string | undefined;
-              if (source?.kind === "device") href = flowHref({ device: source.value });
-              else if (source?.kind === "policy") href = flowHref({ policy: source.value });
-              else if (target?.kind === "country") href = flowHref({ country: target.value });
-              else if (target?.kind === "policy") href = flowHref({ policy: target.value });
-              if (href) router.push(href);
-            }}
-          />
-          <p className="text-muted-foreground mt-2 text-xs">
-            Devices → policies → countries · top 8 per tier · {rangeLabel}
-          </p>
-        </>
-      )}
-    </Card>
+    <div className="flex flex-col gap-4">
+      <Card title="Traffic flow">
+        {isLoading && !data ? (
+          <Skeleton className="h-[420px] w-full" />
+        ) : isError ? (
+          <Empty message="Traffic flow is not available yet" />
+        ) : sankey.links.length === 0 ? (
+          <Empty message="No traffic flow yet" />
+        ) : (
+          <>
+            <SankeyFlow
+              data={sankey}
+              height={420}
+              onLink={(sourceId, targetId) => {
+                const source = parseSankeyId(sourceId);
+                const target = parseSankeyId(targetId);
+                let href: string | undefined;
+                if (source?.kind === "device") href = flowHref({ device: source.value });
+                else if (source?.kind === "policy") href = flowHref({ policy: source.value });
+                else if (target?.kind === "country") href = flowHref({ country: target.value });
+                else if (target?.kind === "policy") href = flowHref({ policy: target.value });
+                if (href) router.push(href);
+              }}
+            />
+            <p className="text-muted-foreground mt-2 text-xs">
+              Devices → policies → countries · top 8 per tier · {rangeLabel}
+            </p>
+          </>
+        )}
+      </Card>
+      <Card title="Decision chains">
+        {chainsLoading && !chainsData ? (
+          <Skeleton className="h-[380px] w-full" />
+        ) : chainsError ? (
+          <Empty message="Decision chains are not available yet" />
+        ) : chains.links.length === 0 ? (
+          <Empty message="No decision chains recorded yet" />
+        ) : (
+          <>
+            <SankeyFlow data={chains} height={380} />
+            <p className="text-muted-foreground mt-2 text-xs">
+              Observed rule → policy group → exit paths · top 12 by traffic
+            </p>
+          </>
+        )}
+      </Card>
+    </div>
   );
 }
 
 export function DestinationsScreen() {
-  const { minutes, range } = useTimeRange();
+  const { minutes, rangeQuery, label } = useTimeRange();
   const [params, updateParams] = useQueryParams();
   const [selected, setSelected] = useState<string | null>(null);
   const tabParam = params.get("tab");
@@ -833,8 +1040,8 @@ export function DestinationsScreen() {
     refetchInterval: 15000,
   });
   const { data: cityData } = useQuery({
-    queryKey: ["cities", minutes],
-    queryFn: () => api.cities(minutes),
+    queryKey: ["cities", minutes, rangeQuery.from, rangeQuery.to],
+    queryFn: () => api.cities(rangeQuery),
     enabled: tab === "map",
     refetchInterval: 30000,
   });
@@ -888,18 +1095,18 @@ export function DestinationsScreen() {
             <DomainsTab
               hosts={hosts}
               host={host}
-              minutes={minutes}
+              rangeQuery={rangeQuery}
               onSelect={selectHost}
               onClose={() => updateParams({ host: undefined })}
             />
           )}
         </TabsPanel>
         <TabsPanel value="ports">
-          {tab === "ports" && <PortsTab minutes={minutes} />}
+          {tab === "ports" && <PortsTab rangeQuery={rangeQuery} />}
         </TabsPanel>
         <TabsPanel value="flow">
           {tab === "flow" && (
-            <FlowTab minutes={minutes} rangeLabel={TIME_RANGES[range].label} />
+            <FlowTab rangeQuery={rangeQuery} rangeLabel={label} />
           )}
         </TabsPanel>
       </Tabs>
