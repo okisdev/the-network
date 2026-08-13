@@ -1,0 +1,11 @@
+services:
+  the-network:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: the-network:local
+    ports:
+      - "9420:9420"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

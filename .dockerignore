@@ -1,0 +1,30 @@
+# Git and local tooling
+.git
+.claude
+.DS_Store
+
+# Dependencies. The image runs pnpm install.
+node_modules
+**/node_modules
+
+# Local runtime data
+data
+**/data
+*.db
+*.db-*
+
+# Local Next.js cache and prior exports. The image rebuilds the console.
+.next
+**/.next
+out
+**/out
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment
+.env
+.env.*
+
+# Tests and logs
+coverage
+*.log

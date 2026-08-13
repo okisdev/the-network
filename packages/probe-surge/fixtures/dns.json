@@ -1,0 +1,33 @@
+{
+  "dnsCache": [
+    {
+      "domain": "claude.ai",
+      "data": ["160.79.104.10"],
+      "server": "https://223.5.5.5/dns-query",
+      "source": "Server",
+      "timeCost": 0.0234,
+      "expiresTime": 1786527600.0
+    },
+    {
+      "domain": "weixin.qq.com",
+      "data": ["109.244.194.121", "109.244.194.122"],
+      "server": "223.5.5.5",
+      "source": "Server",
+      "timeCost": 0.008,
+      "expiresTime": 1786527500.0
+    },
+    {
+      "domain": "push.apple.com",
+      "data": ["17.57.146.20"],
+      "server": "system",
+      "timeCost": 0.012,
+      "expiresTime": 1786527400.0
+    },
+    {
+      "domain": "no-answers.example",
+      "data": [],
+      "server": "223.5.5.5",
+      "timeCost": 0.5
+    }
+  ]
+}

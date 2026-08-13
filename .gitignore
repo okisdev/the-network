@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Runtime data. Each data directory also keeps a local .gitignore so the folder exists after clone.
+*.db
+*.db-*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# OS and local tooling
+.DS_Store
+.claude/

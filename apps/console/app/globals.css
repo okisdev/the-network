@@ -1,0 +1,160 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@source "../**/*.{ts,tsx}";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.15 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0 0);
+  --primary: oklch(0.2 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0 0 0 / 4.5%);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0 0 0 / 4%);
+  --accent-foreground: oklch(0.15 0 0);
+  --destructive: oklch(0.55 0.19 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --ok: oklch(0.62 0.15 158);
+  --warn: oklch(0.66 0.13 75);
+  --border: oklch(0 0 0 / 9%);
+  --input: oklch(0 0 0 / 12%);
+  --ring: oklch(0 0 0 / 35%);
+  --chart-1: oklch(0.55 0.2 293);
+  --chart-2: oklch(0.6 0.12 200);
+  --chart-3: oklch(0.68 0.14 70);
+  --chart-4: oklch(0.6 0.19 350);
+  --chart-5: oklch(0.62 0.14 155);
+  --chart-6: oklch(0.55 0.19 27);
+  --chart-7: oklch(0.55 0 0);
+  --chart-8: oklch(0.7 0.13 130);
+}
+
+.dark {
+  --background: oklch(0.16 0 0);
+  --foreground: oklch(0.93 0 0);
+  --card: oklch(0.2 0 0);
+  --card-foreground: oklch(0.93 0 0);
+  --popover: oklch(0.215 0 0);
+  --popover-foreground: oklch(0.93 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.16 0 0);
+  --muted: oklch(1 0 0 / 5%);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent: oklch(1 0 0 / 5%);
+  --accent-foreground: oklch(0.93 0 0);
+  --destructive: oklch(0.62 0.17 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --ok: oklch(0.68 0.14 158);
+  --warn: oklch(0.72 0.12 75);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(1 0 0 / 40%);
+  --chart-1: oklch(0.64 0.17 293);
+  --chart-2: oklch(0.68 0.11 200);
+  --chart-3: oklch(0.73 0.13 70);
+  --chart-4: oklch(0.68 0.16 350);
+  --chart-5: oklch(0.68 0.13 155);
+  --chart-6: oklch(0.62 0.17 27);
+  --chart-7: oklch(0.62 0 0);
+  --chart-8: oklch(0.74 0.12 130);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    @apply overscroll-none;
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--foreground) 14%, transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

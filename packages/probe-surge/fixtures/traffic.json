@@ -1,0 +1,33 @@
+{
+  "startTime": 1769913600.0,
+  "interface": {
+    "en0": {
+      "in": 48123456789,
+      "out": 3123456789,
+      "inCurrentSpeed": 1250000,
+      "outCurrentSpeed": 88000,
+      "inMaxSpeed": 91000000,
+      "outMaxSpeed": 12000000
+    },
+    "lo0": {
+      "in": 123456,
+      "out": 123456,
+      "inCurrentSpeed": 0,
+      "outCurrentSpeed": 0
+    }
+  },
+  "connector": {
+    "Oracle-JP": {
+      "in": 9123456789,
+      "out": 812345678,
+      "inCurrentSpeed": 420000,
+      "outCurrentSpeed": 20000
+    },
+    "DIRECT": {
+      "in": 30123456789,
+      "out": 2123456789,
+      "inCurrentSpeed": 830000,
+      "outCurrentSpeed": 68000
+    }
+  }
+}

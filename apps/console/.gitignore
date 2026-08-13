@@ -1,0 +1,5 @@
+# Next.js cache, generated types, and static export
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo

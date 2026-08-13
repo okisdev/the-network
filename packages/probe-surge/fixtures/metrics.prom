@@ -1,0 +1,16 @@
+# TYPE surge_uptime_seconds counter
+surge_uptime_seconds 86400
+# TYPE surge_interface_in_bytes_total counter
+surge_interface_in_bytes_total{interface="en0"} 48123456789
+surge_interface_in_bytes_total{interface="lo0"} 123456
+# TYPE surge_interface_out_bytes_total counter
+surge_interface_out_bytes_total{interface="en0"} 3123456789
+surge_interface_out_bytes_total{interface="lo0"} 123456
+# TYPE surge_policy_in_bytes_total counter
+surge_policy_in_bytes_total{policy="Oracle-JP"} 9123456789
+surge_policy_in_bytes_total{policy="DIRECT"} 30123456789
+# TYPE surge_policy_out_bytes_total counter
+surge_policy_out_bytes_total{policy="Oracle-JP"} 812345678
+surge_policy_out_bytes_total{policy="DIRECT"} 2123456789
+# TYPE surge_active_requests gauge
+surge_active_requests 17

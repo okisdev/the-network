@@ -1,0 +1,51 @@
+{
+  "devices": [
+    {
+      "name": "Harry-iPhone",
+      "displayName": "Harry 的 iPhone",
+      "physicalAddress": "AA:11:22:33:44:55",
+      "address": "192.168.31.23",
+      "shouldHandledBySurge": true,
+      "hasProxyConnection": true,
+      "currentInSpeed": 22100,
+      "currentOutSpeed": 2048,
+      "activeConnections": 14,
+      "dhcpDevice": {
+        "hostname": "Harrys-iPhone",
+        "icon": "com.apple.iphone",
+        "assignedIP": "192.168.31.23",
+        "lastSeenDate": 1770000000.0
+      }
+    },
+    {
+      "name": "LivingRoom-TV",
+      "displayName": "客厅电视",
+      "physicalAddress": "BB:22:33:44:55:66",
+      "address": "192.168.31.41",
+      "shouldHandledBySurge": true,
+      "hasProxyConnection": false,
+      "currentInSpeed": 812000,
+      "currentOutSpeed": 15000,
+      "activeConnections": 3,
+      "dhcpDevice": {
+        "hostname": "MiTV",
+        "icon": "generic.tv",
+        "assignedIP": "192.168.31.41",
+        "lastSeenDate": 1769999998.2
+      }
+    },
+    {
+      "name": "",
+      "physicalAddress": "CC:33:44:55:66:77",
+      "address": "192.168.31.87",
+      "shouldHandledBySurge": false,
+      "currentInSpeed": 0,
+      "currentOutSpeed": 0,
+      "dhcpDevice": {
+        "hostname": "espressif-device",
+        "assignedIP": "192.168.31.87",
+        "lastSeenDate": 1769913600.0
+      }
+    }
+  ]
+}
