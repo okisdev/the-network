@@ -13,8 +13,16 @@
 # ghcr.io lives here rather than in Rescue/BlockedDirect.list: it needs a proxy anyway because download classification would send it direct, and it is GitHub, so it should share their exit.
 #
 # github.io is deliberately absent. GitHub Pages is served from different infrastructure and was not part of the measurement.
+#
+# Release assets and Copilot result blobs sit on S3 and Azure, not on the four suffixes above. Unpinned they fall through to FINAL, which is the default proxy group and is often Hong Kong, the path that fails.
 
 DOMAIN-SUFFIX,github.com
 DOMAIN-SUFFIX,githubassets.com
 DOMAIN-SUFFIX,githubusercontent.com
+DOMAIN-SUFFIX,githubapp.com
+DOMAIN-SUFFIX,githubnext.com
 DOMAIN-SUFFIX,ghcr.io
+DOMAIN,github-cloud.s3.amazonaws.com
+DOMAIN-WILDCARD,github-production-*.s3.amazonaws.com
+DOMAIN,copilotprodattachments.blob.core.windows.net
+DOMAIN-WILDCARD,productionresultssa*.blob.core.windows.net
