@@ -1,0 +1,13 @@
+# The Network: X
+#
+# Expects Proxy.
+#
+# The product formerly branded Twitter.
+
+DOMAIN-SUFFIX,periscope.tv
+DOMAIN-SUFFIX,pscp.tv
+DOMAIN-SUFFIX,t.co
+DOMAIN-SUFFIX,tweetdeck.com
+DOMAIN-SUFFIX,twimg.com
+DOMAIN-SUFFIX,twitter.com
+DOMAIN-SUFFIX,x.com

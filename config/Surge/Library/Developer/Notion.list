@@ -1,0 +1,8 @@
+# The Network: Notion
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,notion.com
+DOMAIN-SUFFIX,notion.site
+DOMAIN-SUFFIX,notion.so
+DOMAIN-SUFFIX,notionusercontent.com

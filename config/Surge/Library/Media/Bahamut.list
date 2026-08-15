@@ -1,0 +1,6 @@
+# The Network: Bahamut
+#
+# Expects a streaming policy.
+
+DOMAIN-SUFFIX,bahamut.com.tw
+DOMAIN-SUFFIX,gamer.com.tw

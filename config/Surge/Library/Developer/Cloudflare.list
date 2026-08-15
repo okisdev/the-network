@@ -1,0 +1,13 @@
+# The Network: Cloudflare
+#
+# Expects Proxy.
+#
+# Dashboard, APIs, and Workers. Tunnel edge hosts stay in the overlay and expect DIRECT. Do not send cloudflare-dns.com DIRECT.
+
+DOMAIN-SUFFIX,cloudflare-dns.com
+DOMAIN-SUFFIX,cloudflare.com
+DOMAIN-SUFFIX,cloudflare.net
+DOMAIN-SUFFIX,cloudflareinsights.com
+DOMAIN-SUFFIX,cloudflareworkers.com
+DOMAIN-SUFFIX,pages.dev
+DOMAIN-SUFFIX,workers.dev

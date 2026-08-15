@@ -1,0 +1,17 @@
+# The Network: NTP
+#
+# Expects DIRECT.
+#
+# Time sync should not ride a proxy path.
+
+DOMAIN-SUFFIX,pool.ntp.org
+DOMAIN,ntp.aliyun.com
+DOMAIN,ntp.ntsc.ac.cn
+DOMAIN,ntp.tencent.com
+DOMAIN,time.apple.com
+DOMAIN,time.google.com
+DOMAIN,time.windows.com
+DOMAIN,time1.google.com
+DOMAIN,time2.google.com
+DOMAIN,time3.google.com
+DOMAIN,time4.google.com

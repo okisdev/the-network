@@ -1,0 +1,16 @@
+# The Network: Alibaba
+#
+# Expects Domestic.
+
+DOMAIN-SUFFIX,1688.com
+DOMAIN-SUFFIX,alibaba.com
+DOMAIN-SUFFIX,alicdn.com
+DOMAIN-SUFFIX,alipay.com
+DOMAIN-SUFFIX,alipayobjects.com
+DOMAIN-SUFFIX,aliyun.com
+DOMAIN-SUFFIX,aliyuncs.com
+DOMAIN-SUFFIX,cainiao.com
+DOMAIN-SUFFIX,dingtalk.com
+DOMAIN-SUFFIX,ele.me
+DOMAIN-SUFFIX,taobao.com
+DOMAIN-SUFFIX,tmall.com

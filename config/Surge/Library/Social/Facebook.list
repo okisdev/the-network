@@ -1,0 +1,12 @@
+# The Network: Facebook
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,facebook.com
+DOMAIN-SUFFIX,facebook.net
+DOMAIN-SUFFIX,fb.com
+DOMAIN-SUFFIX,fb.gg
+DOMAIN-SUFFIX,fb.watch
+DOMAIN-SUFFIX,fbcdn.com
+DOMAIN-SUFFIX,fbcdn.net
+DOMAIN-SUFFIX,fbsbx.com

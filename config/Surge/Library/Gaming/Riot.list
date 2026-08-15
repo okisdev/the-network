@@ -1,0 +1,9 @@
+# The Network: Riot
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,leagueoflegends.com
+DOMAIN-SUFFIX,playvalorant.com
+DOMAIN-SUFFIX,pvp.net
+DOMAIN-SUFFIX,riotgames.com
+DOMAIN-SUFFIX,valorant.com

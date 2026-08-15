@@ -3,5 +3,9 @@
 # Expects DIRECT.
 #
 # cloudflared dials the Cloudflare edge on 7844 and carries its own transport security. Proxying it adds a hop to every tunnelled service for no benefit.
+#
+# cfargotunnel.com is the current connector hostname. argotunnel.com is the older name still in use on some agents. trycloudflare.com is the quick-tunnel front.
 
 DOMAIN-SUFFIX,argotunnel.com
+DOMAIN-SUFFIX,cfargotunnel.com
+DOMAIN-SUFFIX,trycloudflare.com

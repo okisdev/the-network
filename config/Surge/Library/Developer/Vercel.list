@@ -1,0 +1,8 @@
+# The Network: Vercel
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,now.sh
+DOMAIN-SUFFIX,vercel-insights.com
+DOMAIN-SUFFIX,vercel.app
+DOMAIN-SUFFIX,vercel.com

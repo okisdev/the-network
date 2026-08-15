@@ -1,0 +1,7 @@
+# The Network: Instagram
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,cdninstagram.com
+DOMAIN-SUFFIX,ig.me
+DOMAIN-SUFFIX,instagram.com

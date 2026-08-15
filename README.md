@@ -1,44 +1,46 @@
 # The Network
 
-Rule sets for the home network gateway.
+Surge rule library for the home network gateway.
 
-The gateway profile is layered. Broad classification sits at the bottom and decides the ordinary cases: what is an ad, what is domestic, what is blocked, what belongs to a streaming service. This repository is the layer above it, and it carries only the rules that layer cannot get right on its own.
+The overlay is the layer this network measured and owns: infrastructure, path faults, and false-positive repairs. The library is first-party classification written in this repository. A profile should subscribe to these files, not to another catalog for the same category.
 
-## What belongs here
+## Overlay
 
 A rule earns a place here when it encodes something specific to this network:
 
-- **Our own infrastructure.** The tailnet address space and the tunnel edge. Nobody outside this network runs these.
-- **Measured path faults.** Destinations that fail through one exit region and succeed through another, established by measurement rather than by reputation.
-- **False positives to repair.** Domestic services that broad ad and tracker classification kills. Each patch names the symptom that produced it.
-- **Direct classifications that die here.** Hosts that generic download classification sends direct, which the GFW then blocks.
-- **Categories worth owning outright.** A category small enough to read in one screen, where the generic version disagrees with how this network actually works, belongs here so that its contents are a decision rather than an inheritance. Size alone is not the argument; size plus disagreement is. The AI category is the first of these: it is small, and the generic version routes the plain GitHub API as if it were a model endpoint while missing several services in daily use here.
+- Our own infrastructure. The tailnet address space and the tunnel edge.
+- Measured path faults. Destinations that fail through one exit region and succeed through another.
+- False positives to repair. Domestic services that ad classification kills. Each patch names the symptom.
+- Direct classifications that die here. Hosts that download classification sends direct, which then fail to connect.
+- Categories worth owning outright. The AI list is the first of these.
 
-## What deliberately does not belong here
+## Library
 
-Carrying these would mean maintaining a worse copy of work that is already done well elsewhere:
+Service and category files under [`config/Surge/Library/`](config/Surge/Library/). Mainland addresses that no service file names are handled by `GEOIP,CN`. There is no imported blocklist. Named services that need a foreign exit have their own file. Everything else falls through to `FINAL`.
 
-- **Ad, tracker, malware, and phishing classification.** Tens of thousands of entries and a full time job to keep current. Our contribution is the repair layer in [`Rescue/`](config/Surge/Rescue/), which is the right division of labour. An earlier experiment with a more aggressive blocking set was reverted permanently: the marginal blocking was entirely false positives.
-- **Domestic and global classification.** Six figures worth of domains. Hand-maintaining either is not viable, and no local judgement is involved.
-- **Streaming region lists, CDN sets, download sets.** Pure volume, tracked by people who test the services.
-- **General settings.** DNS, QUIC policy, MITM, and the policy groups live in the gateway profile, not in a rule set. A `.list` file carries rules only.
+## What does not belong here
+
+- Another project's rule dump, converted or vendored.
+- Rewrite, MITM, and unlock scripts.
+- General settings. DNS, QUIC policy, MITM, and the policy groups live in the gateway profile. A `.list` file carries rules only.
 
 ## Layout
 
 ```
 config/
 └── Surge/
-    ├── AI/               the AI category, owned rather than inherited
+    ├── AI/               owned AI category
     ├── Apple/            push and attachment transfer direct, Intelligence to AI
     ├── GitHub/           pinned away from the Hong Kong exits
     ├── Infrastructure/   our own tunnels
     ├── Rescue/           false positive repairs, plus the watchlist
-    └── Tailscale/        tailnet space, coordination, and the direct domains
+    ├── Tailscale/        tailnet space, coordination, and the direct domains
+    └── Library/          first-party classification
 ```
 
 `config/` is keyed by client, so a second client gets a sibling directory rather than a reshuffle.
 
-Every file states why it exists and which policy it expects at the reference site. Start with [`config/Surge/README.md`](config/Surge/README.md) for the reference block and the ordering constraints.
+Start with [`config/Surge/README.md`](config/Surge/README.md) for the reference block. The drop-in profile is [`config/Surge/Library/profile.snippet`](config/Surge/Library/profile.snippet).
 
 ## Consumer
 

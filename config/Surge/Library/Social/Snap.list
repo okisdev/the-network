@@ -1,0 +1,7 @@
+# The Network: Snap
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,sc-cdn.net
+DOMAIN-SUFFIX,snapchat.com
+DOMAIN-SUFFIX,snapkit.com

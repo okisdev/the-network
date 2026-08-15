@@ -1,0 +1,10 @@
+# The Network: Discord
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,discord.com
+DOMAIN-SUFFIX,discord.gg
+DOMAIN-SUFFIX,discord.gift
+DOMAIN-SUFFIX,discord.media
+DOMAIN-SUFFIX,discordapp.com
+DOMAIN-SUFFIX,discordapp.net

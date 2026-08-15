@@ -1,0 +1,9 @@
+# The Network: Huawei
+#
+# Expects Domestic.
+
+DOMAIN-SUFFIX,dbankcdn.com
+DOMAIN-SUFFIX,hicloud.com
+DOMAIN-SUFFIX,huawei.com
+DOMAIN-SUFFIX,huaweicloud.com
+DOMAIN-SUFFIX,vmall.com

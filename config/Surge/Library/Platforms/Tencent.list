@@ -1,0 +1,15 @@
+# The Network: Tencent
+#
+# Expects Domestic.
+#
+# WeChat has its own file.
+
+DOMAIN-SUFFIX,gtimg.cn
+DOMAIN-SUFFIX,gtimg.com
+DOMAIN-SUFFIX,idqqimg.com
+DOMAIN-SUFFIX,myqcloud.com
+DOMAIN-SUFFIX,qcloud.com
+DOMAIN-SUFFIX,qq.com
+DOMAIN-SUFFIX,tencent-cloud.net
+DOMAIN-SUFFIX,tencent.com
+DOMAIN-SUFFIX,tencentmusic.com

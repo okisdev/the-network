@@ -6,9 +6,11 @@ Base URL for every reference below:
 https://raw.githubusercontent.com/okisdev/the-network/main
 ```
 
-## Reference block
+Two layers. The overlay is measured on this network and must sit first. The library is first-party classification written in this repository.
 
-These rules are the layer above the profile's broad classification, so the whole block must sit ahead of it. Order inside the block matters where noted.
+## Overlay block
+
+These rules are specific to this network. Order inside the block matters where noted.
 
 ```
 # Infrastructure
@@ -22,7 +24,7 @@ RULE-SET,<base>/config/Surge/Tailscale/Coordination.list,Others
 RULE-SET,<base>/config/Surge/Tailscale/Direct.list,DIRECT
 AND,((PROTOCOL,UDP),(DEST-PORT,3478)),DIRECT
 
-# Apple. All three must precede the broader Apple classification.
+# Apple. All three must precede any broader Apple classification.
 RULE-SET,<base>/config/Surge/Apple/ApplePush.list,DIRECT
 RULE-SET,<base>/config/Surge/Apple/iCloudContent.list,DIRECT
 RULE-SET,<base>/config/Surge/Apple/AppleIntelligence.list,AI Suite
@@ -39,24 +41,28 @@ RULE-SET,<base>/config/Surge/AI/AI.list,AI Suite,extended-matching
 RULE-SET,<base>/config/Surge/GitHub/GitHub.list,🇯🇵 JP
 ```
 
-## Categories this block takes over
+## Library block
 
-Two categories are owned here outright rather than layered on top, so the profile's generic equivalents are removed when this block goes in. Leaving either in place reintroduces the behaviour we took ownership of:
+The drop-in composition is [`Library/profile.snippet`](Library/profile.snippet). It already includes the overlay block above. Every file is listed in [`Library/INDEX.md`](Library/INDEX.md).
 
-- **AI services.** Replaced by `AI/AI.list`.
+Mainland addresses that no service file names are handled by `GEOIP,CN`. There is no imported country or block list.
+
+Use `Reject/Ads.list`. It is a short advertising set. Analytics and crash reporters stay out.
+
+Do not hang a company-wide Apple file as DIRECT. Push, iCloud content, and Intelligence stay in the overlay. Media that needs a foreign exit is `Library/Media/AppleMedia.list`.
+
+## Categories the overlay takes over
+
+- **AI services.** The policy this network uses is `AI/AI.list`.
 - **Apple Intelligence.** Replaced by `Apple/AppleIntelligence.list`.
 
-A third category is dropped without replacement: a static list of ChatGPT Voice addresses, five months stale at the time of the review and matching no observed usage here. Those addresses still reach a proxy through the catch-all, so dropping the category costs the ability to steer voice separately, which we do not do.
-
-One behaviour changes on purpose: `api.github.com` moves from the AI policy to the GitHub region pin. It is ordinary GitHub API traffic, and Copilot's model endpoint is `githubcopilot.com`, which the AI set here carries.
+One behaviour is deliberate: `api.github.com` is ordinary GitHub API traffic and lives on the GitHub region pin. Copilot's model endpoint is `githubcopilot.com`, which the AI set carries.
 
 ## What cannot live in a rule set
 
-Two things have to stay inline in the gateway profile, and both are load bearing:
+**Logical rules.** Surge does not accept `AND`, `OR`, or `NOT` inside an external rule set. The UDP 3478 guard that keeps Tailscale's DERP relays direct is a logical rule, so it stays inline.
 
-**Logical rules.** Surge does not accept `AND`, `OR`, or `NOT` inside an external rule set. The UDP 3478 guard that keeps Tailscale's DERP relays direct is a logical rule, so it stays inline. Dropping it makes Tailscale advertise the proxy's address as its endpoint, which defeats NAT traversal and pins every peer to relay.
-
-**Platform directives.** `#!MACOS-ONLY` and `#!IOS-ONLY` are resolved server side by the panel worker before delivery, and they are only honoured on the lines the worker rewrites. A rule set file has no way to express a platform split, which is why `Tailscale/Tailnet.list` is referenced twice with different policies rather than split into two files.
+**Platform directives.** `#!MACOS-ONLY` and `#!IOS-ONLY` are resolved server side by the panel worker before delivery. A rule set file has no way to express a platform split, which is why `Tailscale/Tailnet.list` is referenced twice with different policies.
 
 ## Rule types that do work in a rule set
 
@@ -64,10 +70,12 @@ Two things have to stay inline in the gateway profile, and both are load bearing
 
 ## Ordering rules that are easy to get wrong
 
-- The entire block precedes the profile's broad classification. A repair rule placed behind the classification it is repairing does nothing.
+- Overlay precedes library. A repair rule placed behind the classification it is repairing does nothing.
 - `Tailscale/Coordination.list` precedes `Tailscale/Direct.list`, because the coordination hosts are covered by the `tailscale.com` suffix in the second file.
-- IP rules stay below every domain rule in the profile as a whole. Breaking that order forfeits the protection against DNS poisoning that the layering is built around. The address rules inside this block are the deliberate exception: they all carry `no-resolve`, so they can never trigger a lookup, and they exist only to catch clients that run their own encrypted DNS and therefore arrive as a bare address.
+- Process names, reject, and service lists stay above `GEOIP`.
+- IP rules stay below every domain rule in the profile as a whole. The address rules in the overlay and in `Library/Geo/` all carry `no-resolve`.
+- `Library/Geo/LAN.list` does not carry `100.64.0.0/10`. That range belongs to `Tailscale/Tailnet.list`.
 
 ## Policies referenced
 
-`DIRECT`, `Proxy`, `Domestic`, `Others`, `Tailnet`, and the region groups such as `🇯🇵 JP`. Region groups are generated by the panel worker from whichever nodes the subscriptions carry, so a region with no nodes leaves the group undefined and any rule pointing at it fails to load.
+`DIRECT`, `Proxy`, `Domestic`, `Others`, `Tailnet`, `REJECT`, `AI Suite`, and the region groups such as `🇯🇵 JP`. Region groups are generated by the panel worker from whichever nodes the subscriptions carry, so a region with no nodes leaves the group undefined and any rule pointing at it fails to load.

@@ -1,0 +1,44 @@
+# The Network: Ads
+#
+# Expects REJECT.
+#
+# Known advertising hosts. Keep Rescue ahead of this file. Analytics and crash reporters stay out.
+
+DOMAIN-SUFFIX,2mdn.net
+DOMAIN-SUFFIX,adform.net
+DOMAIN-SUFFIX,adition.com
+DOMAIN-SUFFIX,admaster.com.cn
+DOMAIN-SUFFIX,admob.com
+DOMAIN-SUFFIX,adnxs.com
+DOMAIN-SUFFIX,ads-twitter.com
+DOMAIN-SUFFIX,ads.linkedin.com
+DOMAIN-SUFFIX,ads.yahoo.com
+DOMAIN-SUFFIX,adsafeprotected.com
+DOMAIN-SUFFIX,adservice.google.com
+DOMAIN-SUFFIX,adsrvr.org
+DOMAIN-SUFFIX,advertising.com
+DOMAIN-SUFFIX,alimama.com
+DOMAIN-SUFFIX,amazon-adsystem.com
+DOMAIN-SUFFIX,applovin.com
+DOMAIN-SUFFIX,casalemedia.com
+DOMAIN-SUFFIX,criteo.com
+DOMAIN-SUFFIX,criteo.net
+DOMAIN-SUFFIX,doubleclick.net
+DOMAIN-SUFFIX,googleadservices.com
+DOMAIN-SUFFIX,googlesyndication.com
+DOMAIN-SUFFIX,googletagservices.com
+DOMAIN-SUFFIX,moatads.com
+DOMAIN-SUFFIX,openx.net
+DOMAIN-SUFFIX,outbrain.com
+DOMAIN-SUFFIX,pagead2.googlesyndication.com
+DOMAIN-SUFFIX,pubmatic.com
+DOMAIN-SUFFIX,quantserve.com
+DOMAIN-SUFFIX,rubiconproject.com
+DOMAIN-SUFFIX,scorecardresearch.com
+DOMAIN-SUFFIX,taboola.com
+DOMAIN-SUFFIX,tanx.com
+DOMAIN-SUFFIX,unityads.unity3d.com
+DOMAIN,ads.google.com
+DOMAIN,cpro.baidu.com
+DOMAIN,pagead2.googleadservices.com
+DOMAIN,pos.baidu.com

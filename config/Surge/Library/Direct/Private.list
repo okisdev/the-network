@@ -1,0 +1,13 @@
+# The Network: Private names
+#
+# Expects DIRECT.
+#
+# Names that never leave the machine or the LAN.
+
+DOMAIN-SUFFIX,home.arpa
+DOMAIN-SUFFIX,internal
+DOMAIN-SUFFIX,lan
+DOMAIN-SUFFIX,local
+DOMAIN-SUFFIX,localdomain
+DOMAIN-SUFFIX,localhost
+DOMAIN,localhost

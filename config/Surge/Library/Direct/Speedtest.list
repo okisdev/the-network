@@ -1,0 +1,11 @@
+# The Network: Speedtest
+#
+# Expects DIRECT.
+#
+# Measurement endpoints. Proxying them measures the exit, not the line.
+
+DOMAIN-SUFFIX,ookla.com
+DOMAIN-SUFFIX,speed.cloudflare.com
+DOMAIN-SUFFIX,speedtest.cn
+DOMAIN-SUFFIX,speedtest.net
+DOMAIN,speedtest.tele2.net

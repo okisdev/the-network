@@ -1,0 +1,14 @@
+# The Network: YouTube
+#
+# Expects a streaming policy.
+
+DOMAIN-SUFFIX,ggpht.com
+DOMAIN-SUFFIX,googlevideo.com
+DOMAIN-SUFFIX,youtu.be
+DOMAIN-SUFFIX,youtube-nocookie.com
+DOMAIN-SUFFIX,youtube.com
+DOMAIN-SUFFIX,youtubekids.com
+DOMAIN-SUFFIX,yt.be
+DOMAIN-SUFFIX,ytimg.com
+DOMAIN,youtube-nocookie.com
+DOMAIN,youtubei.googleapis.com

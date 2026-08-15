@@ -1,0 +1,8 @@
+# The Network: iQiyi
+#
+# Expects Domestic.
+
+DOMAIN-SUFFIX,iq.com
+DOMAIN-SUFFIX,iqiyi.com
+DOMAIN-SUFFIX,iqiyipic.com
+DOMAIN-SUFFIX,qy.net

@@ -1,0 +1,10 @@
+# The Network: JetBrains
+#
+# Expects Proxy.
+#
+# The AI endpoint is also in the overlay AI list.
+
+DOMAIN-SUFFIX,jetbrains.ai
+DOMAIN-SUFFIX,jetbrains.com
+DOMAIN-SUFFIX,jetbrains.net
+DOMAIN,api.jetbrains.ai

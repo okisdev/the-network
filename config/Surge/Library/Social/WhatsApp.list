@@ -1,0 +1,7 @@
+# The Network: WhatsApp
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,wa.me
+DOMAIN-SUFFIX,whatsapp.com
+DOMAIN-SUFFIX,whatsapp.net

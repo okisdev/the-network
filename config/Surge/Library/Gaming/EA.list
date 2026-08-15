@@ -1,0 +1,7 @@
+# The Network: EA
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,ea.com
+DOMAIN-SUFFIX,origin.com
+DOMAIN-SUFFIX,origin.ea.com

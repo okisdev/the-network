@@ -1,0 +1,19 @@
+# The Network: Download clients
+#
+# Expects DIRECT.
+#
+# Process names for common download clients. Keep large transfers off the proxy path.
+
+PROCESS-NAME,aria2c
+PROCESS-NAME,BitComet
+PROCESS-NAME,BitTorrent
+PROCESS-NAME,DownloadService
+PROCESS-NAME,fdm
+PROCESS-NAME,Folx
+PROCESS-NAME,NetTransport
+PROCESS-NAME,qBittorrent
+PROCESS-NAME,Thunder
+PROCESS-NAME,ThunderVIP
+PROCESS-NAME,Transmission
+PROCESS-NAME,uTorrent
+PROCESS-NAME,WebTorrent

@@ -1,0 +1,6 @@
+# The Network: Figma
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,figma.com
+DOMAIN-SUFFIX,figma.site

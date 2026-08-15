@@ -1,0 +1,8 @@
+# The Network: Epic Games
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,easy.ac
+DOMAIN-SUFFIX,epicgames.com
+DOMAIN-SUFFIX,epicgames.dev
+DOMAIN-SUFFIX,unrealengine.com

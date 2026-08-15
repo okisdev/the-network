@@ -1,0 +1,7 @@
+# The Network: npm
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,npm.cloudflare.com
+DOMAIN-SUFFIX,npmjs.com
+DOMAIN-SUFFIX,npmjs.org

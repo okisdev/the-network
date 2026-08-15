@@ -1,0 +1,8 @@
+# The Network: PlayStation
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,playstation.com
+DOMAIN-SUFFIX,playstation.net
+DOMAIN-SUFFIX,sie.com
+DOMAIN-SUFFIX,sonyentertainmentnetwork.com

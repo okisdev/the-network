@@ -1,0 +1,29 @@
+# The Network: China CDN
+#
+# Expects DIRECT.
+#
+# Mainland content hosts. Keep large objects on the local last mile.
+
+DOMAIN-SUFFIX,360buyimg.com
+DOMAIN-SUFFIX,71edge.com
+DOMAIN-SUFFIX,alicdn.com
+DOMAIN-SUFFIX,bdstatic.com
+DOMAIN-SUFFIX,bytecdn.cn
+DOMAIN-SUFFIX,byteimg.com
+DOMAIN-SUFFIX,cctvpic.com
+DOMAIN-SUFFIX,cdnhwc1.com
+DOMAIN-SUFFIX,cdnhwc2.com
+DOMAIN-SUFFIX,cdnhwc3.com
+DOMAIN-SUFFIX,douyincdn.com
+DOMAIN-SUFFIX,douyinvod.com
+DOMAIN-SUFFIX,hwcdn.cn
+DOMAIN-SUFFIX,iqiyipic.com
+DOMAIN-SUFFIX,ksyuncs.com
+DOMAIN-SUFFIX,pstatp.com
+DOMAIN-SUFFIX,qcloudcdn.com
+DOMAIN-SUFFIX,qhimg.com
+DOMAIN-SUFFIX,qiniucdn.com
+DOMAIN-SUFFIX,qiniudn.com
+DOMAIN-SUFFIX,tbcdn.cn
+DOMAIN-SUFFIX,upaiyun.com
+DOMAIN-SUFFIX,ykimg.com

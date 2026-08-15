@@ -1,0 +1,17 @@
+# The Network: Cryptocurrency
+#
+# Expects Proxy.
+#
+# Major exchanges and on-chain fronts that need a foreign exit here.
+
+DOMAIN-SUFFIX,binance.com
+DOMAIN-SUFFIX,bitget.com
+DOMAIN-SUFFIX,blockchain.com
+DOMAIN-SUFFIX,bybit.com
+DOMAIN-SUFFIX,coinbase.com
+DOMAIN-SUFFIX,etherscan.io
+DOMAIN-SUFFIX,gate.io
+DOMAIN-SUFFIX,kraken.com
+DOMAIN-SUFFIX,kucoin.com
+DOMAIN-SUFFIX,okex.com
+DOMAIN-SUFFIX,okx.com

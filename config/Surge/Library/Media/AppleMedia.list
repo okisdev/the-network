@@ -1,0 +1,15 @@
+# The Network: Apple media
+#
+# Expects a streaming policy.
+#
+# Music, TV, and podcasts. Push and iCloud content stay in the overlay.
+
+DOMAIN-SUFFIX,applemusic.com
+DOMAIN-SUFFIX,podcasts.apple.com
+DOMAIN,amp-api.music.apple.com
+DOMAIN,aod.itunes.apple.com
+DOMAIN,audio-ssl.itunes.apple.com
+DOMAIN,play-edge.itunes.apple.com
+DOMAIN,play.itunes.apple.com
+DOMAIN,streamingaudio.itunes.apple.com
+DOMAIN,tv.apple.com

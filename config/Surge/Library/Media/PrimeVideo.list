@@ -1,0 +1,9 @@
+# The Network: Prime Video
+#
+# Expects a streaming policy.
+
+DOMAIN-SUFFIX,aiv-cdn.net
+DOMAIN-SUFFIX,aiv-delivery.net
+DOMAIN-SUFFIX,media-amazon.com
+DOMAIN-SUFFIX,primevideo.com
+DOMAIN,atv-ps.amazon.com
