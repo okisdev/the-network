@@ -1,0 +1,12 @@
+# The Network: Microsoft CDN
+#
+# Expects DIRECT.
+#
+# Update and office delivery hosts. Must precede Platforms/Microsoft.list, whose microsoft.com suffix would otherwise take them.
+
+DOMAIN-SUFFIX,sfx.ms
+DOMAIN-SUFFIX,windowsupdate.com
+DOMAIN,dl.delivery.mp.microsoft.com
+DOMAIN,download.microsoft.com
+DOMAIN,officecdn.microsoft.com
+DOMAIN,tlu.dl.delivery.mp.microsoft.com

@@ -1,0 +1,26 @@
+# The Network: Apple services
+#
+# Expects Proxy.
+#
+# Store, account, and update-check hosts. Do not assign DIRECT to this file. Overlay Apple lists and Direct/AppleCDN.list must precede it. Media playback stays in Media/AppleMedia.list.
+
+DOMAIN-SUFFIX,apple.com.cn
+DOMAIN-SUFFIX,icloud.com.cn
+DOMAIN,albert.apple.com
+DOMAIN,appleid.apple.com
+DOMAIN,apps.apple.com
+DOMAIN,buy.itunes.apple.com
+DOMAIN,configuration.apple.com
+DOMAIN,deviceenrollment.apple.com
+DOMAIN,gdmf.apple.com
+DOMAIN,gs.apple.com
+DOMAIN,gsa.apple.com
+DOMAIN,idmsa.apple.com
+DOMAIN,iforgot.apple.com
+DOMAIN,init.itunes.apple.com
+DOMAIN,itunes.apple.com
+DOMAIN,mdmenrollment.apple.com
+DOMAIN,mesu.apple.com
+DOMAIN,se.itunes.apple.com
+DOMAIN,setup.icloud.com
+DOMAIN,xp.apple.com

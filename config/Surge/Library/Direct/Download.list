@@ -2,7 +2,7 @@
 #
 # Expects DIRECT.
 #
-# Domestic download and netdisk fronts. BlockedDirect in the overlay must precede this file.
+# Netdisk fronts plus OS and game content CDNs. BlockedDirect in the overlay must precede this file.
 
 DOMAIN-SUFFIX,123pan.com
 DOMAIN-SUFFIX,alipan.com
@@ -12,7 +12,11 @@ DOMAIN-SUFFIX,lanzoui.com
 DOMAIN-SUFFIX,lanzoux.com
 DOMAIN-SUFFIX,pan.baidu.com
 DOMAIN-SUFFIX,quark.cn
+DOMAIN-SUFFIX,steamcontent.com
 DOMAIN-SUFFIX,thunderurl.com
 DOMAIN-SUFFIX,weiyun.com
+DOMAIN-SUFFIX,windowsupdate.com
 DOMAIN-SUFFIX,wenshushu.cn
 DOMAIN-SUFFIX,xunlei.com
+DOMAIN,dl.delivery.mp.microsoft.com
+DOMAIN,officecdn.microsoft.com

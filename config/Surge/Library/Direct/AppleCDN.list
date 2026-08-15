@@ -1,0 +1,14 @@
+# The Network: Apple CDN
+#
+# Expects DIRECT.
+#
+# Firmware and static objects that have a mainland last mile. Must precede Platforms/AppleServices.list. Push, attachment transfer, and Intelligence stay in the overlay.
+
+DOMAIN-SUFFIX,cdn-apple.com
+DOMAIN-SUFFIX,mzstatic.com
+DOMAIN,appldnld.apple.com
+DOMAIN,devimages-cdn.apple.com
+DOMAIN,download.developer.apple.com
+DOMAIN,oscdn.apple.com
+DOMAIN,swcdn.apple.com
+DOMAIN,swdist.apple.com

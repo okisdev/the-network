@@ -1,13 +1,13 @@
 # Library index
 
-76 first-party rule sets.
+79 first-party rule sets. Policy names match the panel groups.
 
 ### Reject
 
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
-| [`Reject/Ads.list`](Reject/Ads.list) | Ads | REJECT | 38 |
-| [`Reject/HttpDNS.list`](Reject/HttpDNS.list) | HTTP DNS | REJECT | 14 |
+| [`Reject/Ads.list`](Reject/Ads.list) | Ads | AdBlock | 38 |
+| [`Reject/HttpDNS.list`](Reject/HttpDNS.list) | HTTP DNS | AdBlock | 14 |
 
 ### Direct
 
@@ -15,9 +15,10 @@
 | --- | --- | --- | ---: |
 | [`Direct/Private.list`](Direct/Private.list) | Private names | DIRECT | 7 |
 | [`Direct/CDNChina.list`](Direct/CDNChina.list) | China CDN | DIRECT | 23 |
-| [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 12 |
+| [`Direct/AppleCDN.list`](Direct/AppleCDN.list) | Apple CDN | DIRECT | 8 |
+| [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 16 |
 | [`Direct/NTP.list`](Direct/NTP.list) | NTP | DIRECT | 11 |
-| [`Direct/Speedtest.list`](Direct/Speedtest.list) | Speedtest | DIRECT | 5 |
+| [`Direct/Speedtest.list`](Direct/Speedtest.list) | Speedtest | Proxy | 5 |
 
 ### Social
 
@@ -27,7 +28,7 @@
 | [`Social/Facebook.list`](Social/Facebook.list) | Facebook | Proxy | 8 |
 | [`Social/Instagram.list`](Social/Instagram.list) | Instagram | Proxy | 3 |
 | [`Social/Discord.list`](Social/Discord.list) | Discord | Proxy | 6 |
-| [`Social/Telegram.list`](Social/Telegram.list) | Telegram | Proxy | 9 |
+| [`Social/Telegram.list`](Social/Telegram.list) | Telegram | Telegram | 9 |
 | [`Social/WhatsApp.list`](Social/WhatsApp.list) | WhatsApp | Proxy | 3 |
 | [`Social/Line.list`](Social/Line.list) | LINE | Proxy | 4 |
 | [`Social/Reddit.list`](Social/Reddit.list) | Reddit | Proxy | 4 |
@@ -41,7 +42,7 @@
 
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
-| [`Media/Netflix.list`](Media/Netflix.list) | Netflix | a streaming policy | 6 |
+| [`Media/Netflix.list`](Media/Netflix.list) | Netflix | Netflix | 8 |
 | [`Media/YouTube.list`](Media/YouTube.list) | YouTube | a streaming policy | 10 |
 | [`Media/Disney.list`](Media/Disney.list) | Disney | a streaming policy | 5 |
 | [`Media/Spotify.list`](Media/Spotify.list) | Spotify | a streaming policy | 5 |
@@ -50,7 +51,7 @@
 | [`Media/Hulu.list`](Media/Hulu.list) | Hulu | a streaming policy | 3 |
 | [`Media/Twitch.list`](Media/Twitch.list) | Twitch | a streaming policy | 4 |
 | [`Media/PrimeVideo.list`](Media/PrimeVideo.list) | Prime Video | a streaming policy | 5 |
-| [`Media/AppleMedia.list`](Media/AppleMedia.list) | Apple media | a streaming policy | 9 |
+| [`Media/AppleMedia.list`](Media/AppleMedia.list) | Apple media | Proxy | 9 |
 | [`Media/Bilibili.list`](Media/Bilibili.list) | Bilibili | Domestic | 7 |
 | [`Media/iQiyi.list`](Media/iQiyi.list) | iQiyi | Domestic | 4 |
 | [`Media/Youku.list`](Media/Youku.list) | Youku | Domestic | 3 |
@@ -102,7 +103,9 @@
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
 | [`Platforms/Google.list`](Platforms/Google.list) | Google | Proxy | 14 |
-| [`Platforms/Microsoft.list`](Platforms/Microsoft.list) | Microsoft | Proxy | 14 |
+| [`Platforms/AppleServices.list`](Platforms/AppleServices.list) | Apple services | Proxy | 20 |
+| [`Platforms/Microsoft.list`](Platforms/Microsoft.list) | Microsoft | Microsoft | 14 |
+| [`Platforms/MicrosoftCDN.list`](Platforms/MicrosoftCDN.list) | Microsoft CDN | DIRECT | 6 |
 | [`Platforms/Meta.list`](Platforms/Meta.list) | Meta | Proxy | 8 |
 | [`Platforms/Amazon.list`](Platforms/Amazon.list) | Amazon | Proxy | 9 |
 | [`Platforms/ByteDance.list`](Platforms/ByteDance.list) | ByteDance | Domestic | 13 |
@@ -124,7 +127,7 @@
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
 | [`Geo/LAN.list`](Geo/LAN.list) | LAN | DIRECT | 20 |
-| [`Geo/TelegramCIDR.list`](Geo/TelegramCIDR.list) | Telegram CIDR | Proxy | 14 |
+| [`Geo/TelegramCIDR.list`](Geo/TelegramCIDR.list) | Telegram CIDR | Telegram | 14 |
 
 ### Process
 
