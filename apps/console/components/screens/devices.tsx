@@ -1,27 +1,35 @@
 "use client";
 
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { DeviceDto } from "@the-network/schema";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MirroredAreaChart } from "@/components/charts/mirrored-area";
 import { PresenceRibbon } from "@/components/charts/presence-ribbon";
 import { SplitBar } from "@/components/charts/split-bar";
 import { TopologyGraph } from "@/components/charts/topology";
 import { ArrowLink } from "@/components/ui/arrow-link";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CountryChip } from "@/components/ui/country-chip";
 import { DetailList, DetailRow } from "@/components/ui/detail-list";
+import { DomainFavicon } from "@/components/ui/domain-favicon";
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { PageHeader } from "@/components/ui/page-header";
 import { RowList } from "@/components/ui/row-list";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -39,7 +47,7 @@ import { ApiError, api } from "@/lib/api";
 import { policyColor } from "@/lib/chart-colors";
 import { deviceIcon } from "@/lib/device-icons";
 import { formatBytes, formatRate, formatTime, formatTimeAgo } from "@/lib/format";
-import { serviceForPort } from "@/lib/net-labels";
+import { registrableDomain, serviceForPort } from "@/lib/net-labels";
 import { useQueryParams } from "@/lib/use-query-params";
 import { cn } from "@/lib/utils";
 
@@ -142,6 +150,19 @@ export function DevicesScreen() {
     () => Math.max(0, ...filtered.map((device) => device.todayIn + device.todayOut)),
     [filtered],
   );
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paged = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, sortKey, pageSize]);
   const stats = isLoading && !data ? (
     <Skeleton className="h-5 w-80 max-w-full" />
   ) : (
@@ -191,16 +212,15 @@ export function DevicesScreen() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, IP, MAC"
         />
-        {view === "list" && (
-          <span className="text-muted-foreground font-mono text-xs tabular-nums">
-            {filtered.length} device{filtered.length === 1 ? "" : "s"}
-          </span>
-        )}
       </div>
 
       {view === "list" ? (
         <DevicesList
-          devices={filtered}
+          devices={paged}
+          total={filtered.length}
+          page={currentPage}
+          pageCount={pageCount}
+          pageSize={pageSize}
           isLoading={isLoading && !data}
           search={search}
           selectedId={selectedId}
@@ -208,6 +228,8 @@ export function DevicesScreen() {
           ariaSort={ariaSort}
           onSelect={openInspector}
           onSort={setSortKey}
+          onPage={setPage}
+          onPageSize={setPageSize}
         />
       ) : (
         <Card>
@@ -251,6 +273,10 @@ export function DevicesScreen() {
 
 function DevicesList({
   devices,
+  total,
+  page,
+  pageCount,
+  pageSize,
   isLoading,
   search,
   selectedId,
@@ -258,8 +284,14 @@ function DevicesList({
   ariaSort,
   onSelect,
   onSort,
+  onPage,
+  onPageSize,
 }: {
   devices: MergedDevice[];
+  total: number;
+  page: number;
+  pageCount: number;
+  pageSize: number;
   isLoading: boolean;
   search: string;
   selectedId: string | null;
@@ -267,24 +299,17 @@ function DevicesList({
   ariaSort: (key: SortKey) => "ascending" | "descending" | "none";
   onSelect: (deviceId: string) => void;
   onSort: (key: SortKey) => void;
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
 }) {
-  const [showIdle, setShowIdle] = useState(false);
-  const active = devices.filter(
-    (device) =>
-      device.online || device.combinedRate > 0 || device.todayIn + device.todayOut > 0,
-  );
-  const idle = devices.filter(
-    (device) =>
-      !device.online && device.combinedRate === 0 && device.todayIn + device.todayOut === 0,
-  );
-  const queryActive = search.trim().length > 0;
-  const visibleIdle = queryActive || showIdle;
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(total, page * pageSize);
 
   return (
     <Card flush>
       {isLoading ? (
         <DevicesListSkeleton />
-      ) : devices.length === 0 ? (
+      ) : total === 0 ? (
         <Empty
           message={search.trim() ? "No devices match this search" : "No devices yet"}
           hint={
@@ -294,76 +319,51 @@ function DevicesList({
           }
         />
       ) : (
-        <Table
-          className="min-w-[880px]"
-          containerClassName="max-h-[calc(100dvh-20rem)] overflow-y-auto"
-        >
-          <TableHead className="bg-card sticky top-0 z-10">
-            <TableRow className="hover:bg-transparent">
-              <TableHeader className="px-4">Status</TableHeader>
-              <TableHeader
-                className="hover:text-foreground cursor-pointer"
-                aria-sort={ariaSort("name")}
-                onClick={() => onSort("name")}
-              >
-                Device
-              </TableHeader>
-              <TableHeader>IPs</TableHeader>
-              <TableHeader
-                className="hover:text-foreground cursor-pointer text-right"
-                aria-sort={ariaSort("rate")}
-                onClick={() => onSort("rate")}
-              >
-                Down
-              </TableHeader>
-              <TableHeader
-                className="hover:text-foreground cursor-pointer text-right"
-                aria-sort={ariaSort("rate")}
-                onClick={() => onSort("rate")}
-              >
-                Up
-              </TableHeader>
-              <TableHeader
-                className="hover:text-foreground cursor-pointer text-right"
-                aria-sort={ariaSort("today")}
-                onClick={() => onSort("today")}
-              >
-                Today
-              </TableHeader>
-              <TableHeader
-                className="hover:text-foreground cursor-pointer px-4"
-                aria-sort={ariaSort("lastSeen")}
-                onClick={() => onSort("lastSeen")}
-              >
-                Last seen
-              </TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {active.map((device) => (
-              <DeviceTableRow
-                key={device.id}
-                device={device}
-                selectedId={selectedId}
-                todayMaximum={todayMaximum}
-                onSelect={onSelect}
-              />
-            ))}
-            {!queryActive && idle.length > 0 && (
-              <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={7} className="p-0">
-                  <button
-                    type="button"
-                    className="border-border text-muted-foreground hover:bg-muted w-full border-t px-4 py-2.5 text-left text-xs"
-                    onClick={() => setShowIdle((visible) => !visible)}
-                  >
-                    {showIdle ? "Hide" : "Show"} {idle.length} idle devices
-                  </button>
-                </TableCell>
+        <>
+          <Table className="min-w-[880px]">
+            <TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHeader className="px-4">Status</TableHeader>
+                <TableHeader
+                  className="hover:text-foreground cursor-pointer"
+                  aria-sort={ariaSort("name")}
+                  onClick={() => onSort("name")}
+                >
+                  Device
+                </TableHeader>
+                <TableHeader>IPs</TableHeader>
+                <TableHeader
+                  className="hover:text-foreground cursor-pointer text-right"
+                  aria-sort={ariaSort("rate")}
+                  onClick={() => onSort("rate")}
+                >
+                  Down
+                </TableHeader>
+                <TableHeader
+                  className="hover:text-foreground cursor-pointer text-right"
+                  aria-sort={ariaSort("rate")}
+                  onClick={() => onSort("rate")}
+                >
+                  Up
+                </TableHeader>
+                <TableHeader
+                  className="hover:text-foreground cursor-pointer text-right"
+                  aria-sort={ariaSort("today")}
+                  onClick={() => onSort("today")}
+                >
+                  Today
+                </TableHeader>
+                <TableHeader
+                  className="hover:text-foreground cursor-pointer px-4"
+                  aria-sort={ariaSort("lastSeen")}
+                  onClick={() => onSort("lastSeen")}
+                >
+                  Last seen
+                </TableHeader>
               </TableRow>
-            )}
-            {visibleIdle &&
-              idle.map((device) => (
+            </TableHead>
+            <TableBody>
+              {devices.map((device) => (
                 <DeviceTableRow
                   key={device.id}
                   device={device}
@@ -372,8 +372,52 @@ function DevicesList({
                   onSelect={onSelect}
                 />
               ))}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+          <footer className="border-border flex flex-wrap items-center justify-between gap-3 border-t px-4 py-2.5">
+            <span className="text-muted-foreground font-mono text-xs tabular-nums">
+              {total.toLocaleString()} device{total === 1 ? "" : "s"}
+              {total > pageSize && ` · ${rangeStart}–${rangeEnd}`}
+            </span>
+            <div className="flex items-center gap-2">
+              <Select value={String(pageSize)} onValueChange={(value) => onPageSize(Number(value))}>
+                <SelectTrigger aria-label="Rows per page" className="py-1 text-xs">
+                  <SelectValue>{pageSize} / page</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {[25, 50, 100].map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size} / page
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Previous page"
+                disabled={page <= 1}
+                onClick={() => onPage(page - 1)}
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+              <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                {page} / {pageCount}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Next page"
+                disabled={page >= pageCount}
+                onClick={() => onPage(page + 1)}
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </footer>
+        </>
       )}
     </Card>
   );
@@ -600,6 +644,7 @@ function DeviceInspector({
                 items={detail.topHosts.slice(0, 8).map((row) => ({
                   key: row.key,
                   label: row.key,
+                  icon: <DomainFavicon domain={registrableDomain(row.key)} />,
                   value: row.bytesIn + row.bytesOut,
                   sub: `${row.flows} flow${row.flows === 1 ? "" : "s"}`,
                 }))}

@@ -53,6 +53,7 @@ export const dnsEventSchema = z.object({
   rttMs: z.number().optional(),
   server: z.string().optional(),
   source: z.enum(['cache', 'server']).optional(),
+  expiresAt: z.number().optional(),
 });
 export type DnsEvent = z.infer<typeof dnsEventSchema>;
 

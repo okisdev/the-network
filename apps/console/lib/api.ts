@@ -10,6 +10,7 @@ import type {
   DeviceDetailDto,
   DeviceDto,
   DnsLogPage,
+  DnsQnameDetail,
   DnsSummaryDto,
   FirstSeenDto,
   FlowsPage,
@@ -116,6 +117,10 @@ export const api = {
     request<HostDetailDto>(`/api/hosts/${encodeURIComponent(host)}${qs(rangeParams(range))}`),
   dnsSummary: (range: number | RangeQuery) =>
     request<DnsSummaryDto>(`/api/dns/summary${qs(rangeParams(range))}`),
+  dnsQname: (name: string, range: RangeQuery) =>
+    request<DnsQnameDetail>(
+      `/api/dns/qname${qs({ name, ...rangeParams(range) })}`,
+    ),
   authStatus: () => request<AuthStatusDto>("/api/auth/status"),
   login: (token: string) =>
     request<AuthStatusDto>("/api/auth/login", { method: "POST", body: JSON.stringify({ token }) }),
@@ -123,7 +128,16 @@ export const api = {
   destinations: () => request<DestinationsDto>("/api/destinations"),
   countryDevices: (code: string) =>
     request<CountryDeviceShare[]>(`/api/destinations/${encodeURIComponent(code)}/devices`),
-  dnsLogs: (query: LogsQuery = {}) => request<DnsLogPage>(`/api/logs/dns${qs(query)}`),
+  dnsLogs: (
+    query: LogsQuery & {
+      source?: "cache" | "server";
+      server?: string;
+      unanswered?: boolean;
+    } = {},
+  ) =>
+    request<DnsLogPage>(
+      `/api/logs/dns${qs({ ...query, unanswered: query.unanswered ? 1 : undefined })}`,
+    ),
   systemLogs: (query: LogsQuery = {}) => request<SystemLogPage>(`/api/logs/system${qs(query)}`),
   sources: () => request<SourceDto[]>("/api/sources"),
   sourceHealth: (id: string, range: number | RangeQuery) =>

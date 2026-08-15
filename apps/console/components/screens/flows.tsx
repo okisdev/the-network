@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CountryChip } from "@/components/ui/country-chip";
 import { DetailList, DetailRow } from "@/components/ui/detail-list";
+import { DomainFavicon, GlobeFallback } from "@/components/ui/domain-favicon";
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
@@ -49,7 +50,7 @@ import { useQueryParams } from "@/lib/use-query-params";
 import { cn } from "@/lib/utils";
 
 const COLS =
-  "grid grid-cols-[72px_1fr_120px_1.4fr_150px_1fr_90px_90px_70px] gap-2 items-center";
+  "grid grid-cols-[10px_72px_1fr_120px_1.4fr_150px_1fr_90px_90px] gap-2 items-center";
 const ALL = "all";
 
 type ProtoFilter = "" | "tcp" | "udp" | "other";
@@ -106,6 +107,10 @@ function useDebounced<T>(value: T, ms: number): T {
 
 function totalBytes(group: DomainGroup): number {
   return group.bytesIn + group.bytesOut;
+}
+
+function isDomainLabel(label: string): boolean {
+  return label.includes(".") && !/^[\d.]+$/.test(label) && !label.includes(":");
 }
 
 function buildGroups(flows: FlowDto[]): DeviceGroup[] {
@@ -735,6 +740,9 @@ export function FlowsScreen() {
                 "bg-card text-muted-foreground sticky top-0 z-10 border-b border-border px-3 py-2 text-xs font-medium",
               )}
             >
+              <span>
+                <span className="sr-only">State</span>
+              </span>
               <span>Time</span>
               <span>Device</span>
               <span>Process</span>
@@ -743,7 +751,6 @@ export function FlowsScreen() {
               <span>Rule</span>
               <span className="text-right">Down</span>
               <span className="text-right">Up</span>
-              <span>State</span>
             </div>
             <div
               className="relative w-full"
@@ -864,7 +871,8 @@ const FlowRow = memo(function FlowRow({
   virtualIndex: number;
   onSelect: () => void;
 }) {
-  const destination = flow.dst.host || flow.rdns || flow.dst.ip || "—";
+  const hostname = flow.dst.host || flow.rdns;
+  const destination = hostname || flow.dst.ip || "—";
   const port = flow.dst.port != null ? `:${flow.dst.port}` : "";
   const policyTitle = flow.policyGroup
     ? `${flow.policyGroup} → ${flow.policy ?? "—"}`
@@ -883,6 +891,9 @@ const FlowRow = memo(function FlowRow({
         fresh && "bg-primary/10",
       )}
     >
+      <span title={flow.state}>
+        <StatusDot tone={stateTone(flow.state)} />
+      </span>
       <span className="text-muted-foreground font-mono tabular-nums">
         {formatTime(flow.ts)}
       </span>
@@ -893,25 +904,21 @@ const FlowRow = memo(function FlowRow({
       >
         {flow.process ?? "—"}
       </span>
-      <span className="min-w-0 truncate">
-        <span
-          className={flow.dst.host || flow.rdns ? "text-foreground font-medium" : "text-foreground"}
-          title={flow.dst.ip}
-        >
-          {destination}
+      <span className="flex min-w-0 items-center gap-1.5">
+        {hostname ? (
+          <DomainFavicon domain={registrableDomain(hostname)} />
+        ) : (
+          <GlobeFallback />
+        )}
+        <span className="min-w-0 truncate" title={flow.dst.ip}>
+          <span className={hostname ? "text-foreground font-medium" : "text-foreground"}>
+            {destination}
+          </span>
+          {port && (
+            <span className="text-muted-foreground font-mono tabular-nums">{port}</span>
+          )}
         </span>
-        {port && (
-          <span className="text-muted-foreground font-mono tabular-nums">{port}</span>
-        )}
-        {flow.dst.proto && (
-          <span className="text-muted-foreground font-mono text-2xs"> · {flow.dst.proto}</span>
-        )}
-        {flow.country && (
-          <>
-            {" "}
-            <CountryChip code={flow.country} />
-          </>
-        )}
+        {flow.country && <CountryChip short code={flow.country} />}
       </span>
       <span className="flex min-w-0 items-center gap-1" title={policyTitle}>
         {flow.policy ? (
@@ -935,10 +942,6 @@ const FlowRow = memo(function FlowRow({
       </span>
       <span className="text-foreground text-right font-mono tabular-nums">
         {formatBytes(flow.bytesOut)}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <StatusDot tone={stateTone(flow.state)} />
-        <span className="text-muted-foreground font-mono text-2xs">{flow.state}</span>
       </span>
     </button>
   );
@@ -1085,6 +1088,11 @@ function GroupLeafRow({
       onClick={onSelect}
       className="hover:bg-muted focus-visible:ring-ring flex w-full items-center gap-2 py-2 pe-4 ps-16 text-left focus-visible:ring-2 focus-visible:outline-none"
     >
+      {isDomainLabel(group.label) ? (
+        <DomainFavicon domain={group.label} />
+      ) : (
+        <GlobeFallback />
+      )}
       <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
         {group.label}
       </span>
@@ -1133,7 +1141,8 @@ function FlowInspector({
     );
   }
 
-  const destination = flow.dst.host ?? flow.dst.ip ?? "Flow";
+  const hostname = flow.dst.host || flow.rdns;
+  const destination = hostname ?? flow.dst.ip ?? "Flow";
   const service = flow.dst.port != null ? serviceForPort(flow.dst.port) : undefined;
   const duration =
     flow.startedAt != null && flow.endedAt != null
@@ -1147,7 +1156,16 @@ function FlowInspector({
     <InspectorPanel
       open
       onClose={onClose}
-      title={destination}
+      title={
+        <span className="flex min-w-0 items-center gap-2">
+          {hostname ? (
+            <DomainFavicon key={hostname} domain={registrableDomain(hostname)} />
+          ) : (
+            <GlobeFallback />
+          )}
+          <span className="truncate">{destination}</span>
+        </span>
+      }
       sub={`${flow.deviceName} · ${formatTime(flow.ts)}`}
     >
       <InspectorSection title="Destination">

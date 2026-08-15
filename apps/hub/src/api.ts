@@ -21,7 +21,9 @@ import {
 } from '@the-network/schema';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
+import { createAsnLookup } from './asn.ts';
 import { FLOWS_RETENTION_MS, type HubConfig } from './config.ts';
+import { logger } from './logger.ts';
 import { Pipeline } from './pipeline.ts';
 import { ProbeManager } from './probes.ts';
 import { Realtime } from './realtime.ts';
@@ -32,7 +34,7 @@ import {
   type ParsedRuleList,
   type ParsedSurgeProfile,
 } from './rules.ts';
-import type { ExplicitWindow, SourceRecord } from './store.ts';
+import type { DnsLogsQuery, ExplicitWindow, SourceRecord } from './store.ts';
 import { Store } from './store.ts';
 
 const sourceInputSchema = z.object({
@@ -103,6 +105,15 @@ const logsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
+const dnsLogsQuerySchema = logsQuerySchema.omit({ level: true }).extend({
+  source: z.enum(['cache', 'server']).optional(),
+  server: z.string().min(1).optional(),
+  unanswered: z
+    .literal('1')
+    .transform(() => true)
+    .optional(),
+});
+
 const timeseriesQuerySchema = z
   .object({
     scope: z
@@ -121,6 +132,14 @@ const minutesSchema = z.coerce.number().int().min(1).max(525_600);
 
 const minutesQuerySchema = z
   .object({ minutes: minutesSchema, ...windowFields })
+  .superRefine(validateWindow);
+
+const dnsQnameQuerySchema = z
+  .object({
+    name: z.string().trim().min(1),
+    minutes: minutesSchema,
+    ...windowFields,
+  })
   .superRefine(validateWindow);
 
 const deviceDetailParamsSchema = z.object({ id: z.string().min(1) });
@@ -261,7 +280,8 @@ export interface ApiOptions {
     | 'faviconsEnabled'
     | 'surgeProfilePath'
     | 'surgeListsDir'
-  >;
+  > &
+    Partial<Pick<HubConfig, 'asnDbPath'>>;
   store: Store;
   pipeline: Pipeline;
   probes: ProbeManager;
@@ -302,6 +322,11 @@ function sourceDto(source: SourceRecord, probes: ProbeManager): SourceDto {
 export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   const { store, pipeline, probes, realtime } = options;
+  if (options.config.asnDbPath !== undefined) {
+    store.configureDnsEnrichment({
+      asnLookup: createAsnLookup(options.config.asnDbPath, logger),
+    });
+  }
   const authToken = options.config.authToken;
   const fetchFavicon = options.fetch ?? globalThis.fetch;
   const faviconDir = join(options.config.dataDir, 'favicons');
@@ -555,13 +580,18 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
   );
 
   app.get('/api/logs/dns', async (request) => {
-    const query = logsQuerySchema.parse(request.query) as LogsQuery;
+    const query = dnsLogsQuerySchema.parse(request.query) as DnsLogsQuery;
     return store.listDnsLog(query);
   });
 
   app.get('/api/dns/summary', async (request) => {
     const query = minutesQuerySchema.parse(request.query);
     return store.dnsSummary(query.minutes, undefined, explicitWindow(query));
+  });
+
+  app.get('/api/dns/qname', async (request) => {
+    const query = dnsQnameQuerySchema.parse(request.query);
+    return store.dnsQnameDetail(query.name, query.minutes, undefined, explicitWindow(query));
   });
 
   app.get<{ Params: { host: string } }>('/api/hosts/:host', async (request) => {

@@ -5,6 +5,7 @@ import type {
   CatalogDomainDto,
   CityPoint,
   DeviceDetailDto,
+  DnsQnameDetail,
   DnsSummaryDto,
   FlowsPage,
   HostDetailDto,
@@ -1243,6 +1244,8 @@ FINAL,AI Suite,dns-failed
         qname: 'push.apple.com',
         answers: ['17.57.146.20'],
         rttMs: 12,
+        server: '1.1.1.1',
+        source: 'server',
       },
       {
         kind: 'dns',
@@ -1250,6 +1253,8 @@ FINAL,AI Suite,dns-failed
         device: {},
         qname: 'example.net',
         answers: [],
+        server: 'system',
+        source: 'cache',
       },
     ]);
     unsubscribe();
@@ -1273,16 +1278,62 @@ FINAL,AI Suite,dns-failed
         }),
       ],
     });
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/api/logs/dns?source=cache&server=system&unanswered=1',
+    });
+    expect(filtered.statusCode).toBe(200);
+    expect(filtered.json()).toMatchObject({ entries: [{ qname: 'example.net', answers: [] }] });
   });
 
   it('returns zero-filled DNS summary buckets and ranked resolver statistics', async () => {
     const now = Date.now();
     for (const entry of [
-      { id: 'dns-1', ts: now - 1_000, qname: 'alpha.example', answers: ['1.1.1.1'], rttMs: 5, server: '1.1.1.1' },
-      { id: 'dns-2', ts: now - 10_000, qname: 'alpha.example', answers: [], rttMs: 25, server: '1.1.1.1' },
-      { id: 'dns-3', ts: now - 61_000, qname: 'beta.example', answers: ['2.2.2.2'], rttMs: 75, server: '1.1.1.1' },
-      { id: 'dns-4', ts: now - 121_000, qname: 'gamma.example', answers: [], rttMs: 150, server: '8.8.8.8' },
-      { id: 'dns-5', ts: now - 181_000, qname: 'delta.example', answers: [], rttMs: 350, server: '8.8.8.8' },
+      {
+        id: 'dns-1',
+        ts: now - 1_000,
+        qname: 'alpha.example',
+        answers: ['1.1.1.1'],
+        rttMs: 5,
+        server: '1.1.1.1',
+        source: 'server' as const,
+      },
+      {
+        id: 'dns-2',
+        ts: now - 10_000,
+        qname: 'alpha.example',
+        answers: [],
+        rttMs: 25,
+        server: '1.1.1.1',
+        source: 'cache' as const,
+      },
+      {
+        id: 'dns-3',
+        ts: now - 61_000,
+        qname: 'beta.example',
+        answers: ['2.2.2.2'],
+        rttMs: 75,
+        server: '1.1.1.1',
+        source: 'server' as const,
+      },
+      {
+        id: 'dns-4',
+        ts: now - 121_000,
+        qname: 'gamma.example',
+        answers: [],
+        rttMs: 150,
+        server: '8.8.8.8',
+        source: 'server' as const,
+      },
+      {
+        id: 'dns-5',
+        ts: now - 181_000,
+        qname: 'delta.example',
+        answers: [],
+        rttMs: 350,
+        server: '8.8.8.8',
+        source: 'server' as const,
+      },
     ]) {
       store.appendDnsLog(entry);
     }
@@ -1304,10 +1355,57 @@ FINAL,AI Suite,dns-failed
       answered: 2,
       unanswered: 3,
       resolvers: [
-        { server: '1.1.1.1', count: 3 },
-        { server: '8.8.8.8', count: 2 },
+        { server: '1.1.1.1', count: 3, medianRttMs: 25 },
+        { server: '8.8.8.8', count: 2, medianRttMs: 250 },
       ],
     });
+  });
+
+  it('returns exact per-qname DNS detail with zero-filled buckets', async () => {
+    const now = Date.now();
+    for (const entry of [
+      {
+        id: 'dns-detail-1',
+        ts: now - 1_000,
+        qname: 'alpha.example',
+        answers: ['1.1.1.1'],
+        server: '1.1.1.1',
+        source: 'server' as const,
+      },
+      {
+        id: 'dns-detail-2',
+        ts: now - 10_000,
+        qname: 'alpha.example',
+        answers: [],
+        server: '1.1.1.1',
+        source: 'cache' as const,
+      },
+      {
+        id: 'dns-detail-other',
+        ts: now - 20_000,
+        qname: 'other.example',
+        answers: [],
+        server: '8.8.8.8',
+        source: 'server' as const,
+      },
+    ]) {
+      store.appendDnsLog(entry);
+    }
+
+    const detailResponse = await app.inject({
+      method: 'GET',
+      url: '/api/dns/qname?name=alpha.example&minutes=5',
+    });
+    expect(detailResponse.statusCode).toBe(200);
+    const detail = detailResponse.json<DnsQnameDetail>();
+    expect(detail).toMatchObject({
+      qname: 'alpha.example',
+      total: 2,
+      resolvers: [{ server: '1.1.1.1', count: 2 }],
+      sources: { cache: 1, server: 1 },
+    });
+    expect(detail.series).toHaveLength(5);
+    expect(detail.series.reduce((total, point) => total + point.count, 0)).toBe(2);
   });
 
   it('filters system logs by level and search', async () => {
@@ -1596,10 +1694,14 @@ FINAL,AI Suite,dns-failed
       '/api/flows?port=1.5',
       '/api/flows?process=',
       '/api/flows?from=nope',
+      '/api/logs/dns?source=origin',
+      '/api/logs/dns?server=',
+      '/api/logs/dns?unanswered=0',
       '/api/devices/device-1/detail?minutes=0',
       '/api/destinations/cities?minutes=0',
       '/api/hosts/example.com?minutes=0',
       '/api/dns/summary?minutes=0',
+      '/api/dns/qname?minutes=1',
       '/api/timeseries/multi?scope=device&minutes=1&limit=13',
       '/api/breakdown?dim=nope&minutes=1',
       '/api/breakdown?dim=domain&minutes=1&policy=',
@@ -1620,6 +1722,7 @@ FINAL,AI Suite,dns-failed
       '/api/insights/rejected?minutes=1&from=2&to=1',
       '/api/insights/movers?minutes=1&from=2&to=1',
       '/api/dns/summary?minutes=1&from=2&to=1',
+      '/api/dns/qname?name=alpha.example&minutes=1&from=2&to=1',
       '/api/destinations/cities?minutes=1&from=2&to=1',
       '/api/devices/device-1/detail?minutes=1&from=2&to=1',
       '/api/hosts/example.com?minutes=1&from=2&to=1',

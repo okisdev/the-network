@@ -87,6 +87,13 @@ export interface CountryDeviceShare {
   flows: number;
 }
 
+export interface DnsAnswerMeta {
+  value: string;
+  country?: string;
+  asn?: number;
+  asOrg?: string;
+}
+
 export interface DnsLogEntry {
   id: string;
   ts: number;
@@ -94,9 +101,12 @@ export interface DnsLogEntry {
   deviceName?: string;
   qname: string;
   answers: string[];
+  answersMeta?: DnsAnswerMeta[];
   rttMs?: number;
   server?: string;
   source?: 'cache' | 'server';
+  expiresAt?: number;
+  inferredDevice?: { id: string; name: string };
 }
 
 export interface SystemLogEntry {
@@ -321,7 +331,15 @@ export interface DnsSummaryDto {
   rttBuckets: Array<{ label: string; count: number }>;
   answered: number;
   unanswered: number;
+  resolvers: Array<{ server: string; count: number; medianRttMs?: number }>;
+}
+
+export interface DnsQnameDetail {
+  qname: string;
+  total: number;
+  series: Array<{ ts: number; count: number }>;
   resolvers: Array<{ server: string; count: number }>;
+  sources: { cache: number; server: number };
 }
 
 export interface RuleGroupMemberDto {

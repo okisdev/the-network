@@ -15,6 +15,7 @@ describe('mapDnsCache', () => {
       qname: 'claude.ai',
       answers: ['160.79.104.10'],
       rttMs: 23,
+      expiresAt: 1_786_527_600_000,
       server: 'https://223.5.5.5/dns-query',
       source: 'server',
     });
@@ -30,6 +31,7 @@ describe('mapDnsCache', () => {
     });
     expect(events[3]?.server).toBe('223.5.5.5');
     expect(events[3]?.source).toBeUndefined();
+    expect(events[3]?.expiresAt).toBeUndefined();
   });
 
   it('passes server through and maps source Server/Cache', () => {

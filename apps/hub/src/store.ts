@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type BetterSqlite3 from 'better-sqlite3';
 import type {
   BreakdownDim,
@@ -12,8 +13,10 @@ import type {
   DestinationsDto,
   DeviceDto,
   DeviceHint,
+  DnsAnswerMeta,
   DnsLogEntry,
   DnsLogPage,
+  DnsQnameDetail,
   DnsSummaryDto,
   EventDto,
   FlowDto,
@@ -36,6 +39,7 @@ import type {
   TimeseriesPoint,
   TimeseriesScope,
 } from '@the-network/schema';
+import type { AsnLookup } from './asn.ts';
 import {
   DNS_LOG_RETENTION_MS,
   EVENTS_RETENTION_MS,
@@ -45,6 +49,18 @@ import {
   SOURCE_HEALTH_RETENTION_MS,
   SYSTEM_LOG_RETENTION_MS,
 } from './config.ts';
+import { createGeoLookup, type GeoLookup, type GeoResolver } from './geo.ts';
+
+export interface DnsLogsQuery extends LogsQuery {
+  source?: 'cache' | 'server';
+  server?: string;
+  unanswered?: boolean;
+}
+
+export interface StoreEnrichmentOptions {
+  geoLookup?: GeoResolver;
+  asnLookup?: AsnLookup;
+}
 
 export interface SourceRecord {
   id: string;
@@ -223,10 +239,18 @@ interface DnsLogRow {
   device_id: string | null;
   device_name: string | null;
   qname: string;
-  answers_json: string;
+  answers_json: string | null;
   rtt_ms: number | null;
   server: string | null;
   source: DnsLogEntry['source'] | null;
+  expires_at: number | null;
+}
+
+interface DnsFlowCandidateRow {
+  host: string;
+  device_id: string | null;
+  t: number;
+  name: string | null;
 }
 
 interface PresenceRow {
@@ -317,8 +341,13 @@ interface DnsBucketRow {
 }
 
 interface DnsAnswerRow {
-  answers_json: string;
+  answers_json: string | null;
   rtt_ms: number | null;
+}
+
+interface DnsResolverRttRow {
+  server: string;
+  rtt_ms: number;
 }
 
 interface DomainSqlRow {
@@ -417,6 +446,35 @@ function retainedFlowWindow(minutes: number, now: number, window?: ExplicitWindo
   };
 }
 
+function dnsQueryWindow(
+  minutes: number,
+  now: number,
+  window?: ExplicitWindow,
+): { resolution: number; points: number; start: number; from: number; to: number } {
+  const retainedMinutes = DNS_LOG_RETENTION_MS / MINUTE_MS;
+  const { resolution, points, start } = rollupWindow(
+    window === undefined ? Math.min(minutes, retainedMinutes) : minutes,
+    now,
+    window,
+  );
+  return {
+    resolution,
+    points,
+    start,
+    from: window?.from ?? start,
+    to: window?.to ?? now,
+  };
+}
+
+function median(values: number[]): number | undefined {
+  if (values.length === 0) return undefined;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[middle]
+    : (sorted[middle - 1]! + sorted[middle]!) / 2;
+}
+
 function localDayKey(ts: number): string {
   const date = new Date(ts);
   const year = String(date.getFullYear()).padStart(4, '0');
@@ -500,10 +558,12 @@ function flowFromRow(row: FlowRow): FlowDto {
 
 function dnsLogFromRow(row: DnsLogRow): DnsLogEntry {
   let answers: string[] = [];
-  try {
-    const value: unknown = JSON.parse(row.answers_json);
-    if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) answers = value;
-  } catch {}
+  if (row.answers_json !== null) {
+    try {
+      const value: unknown = JSON.parse(row.answers_json);
+      if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) answers = value;
+    } catch {}
+  }
   return {
     id: row.id,
     ts: row.ts,
@@ -514,6 +574,7 @@ function dnsLogFromRow(row: DnsLogRow): DnsLogEntry {
     ...(row.rtt_ms === null ? {} : { rttMs: row.rtt_ms }),
     ...(row.server === null ? {} : { server: row.server }),
     ...(row.source === null ? {} : { source: row.source }),
+    ...(row.expires_at === null ? {} : { expiresAt: row.expires_at }),
   };
 }
 
@@ -657,7 +718,8 @@ export function runMigrations(db: BetterSqlite3.Database): void {
       device_id TEXT,
       qname TEXT,
       answers_json TEXT,
-      rtt_ms REAL
+      rtt_ms REAL,
+      expires_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS dns_log_ts_idx ON dns_log (ts);
     CREATE TABLE IF NOT EXISTS presence_log (
@@ -711,16 +773,33 @@ export function runMigrations(db: BetterSqlite3.Database): void {
   const dnsColumns = new Set(
     (db.prepare('PRAGMA table_info(dns_log)').all() as Array<{ name: string }>).map((column) => column.name),
   );
-  for (const name of ['server', 'source'] as const) {
-    if (!dnsColumns.has(name)) db.exec(`ALTER TABLE dns_log ADD COLUMN ${name} TEXT`);
+  const dnsColumnMigrations = [
+    ['server', 'TEXT'],
+    ['source', 'TEXT'],
+    ['expires_at', 'INTEGER'],
+  ] as const;
+  for (const [name, type] of dnsColumnMigrations) {
+    if (!dnsColumns.has(name)) db.exec(`ALTER TABLE dns_log ADD COLUMN ${name} ${type}`);
   }
 }
 
 export class Store {
+  private geoLookup: GeoLookup;
+  private asnLookup: AsnLookup;
+
   constructor(
     private readonly db: BetterSqlite3.Database,
     private readonly now: () => number = Date.now,
-  ) {}
+    enrichment: StoreEnrichmentOptions = {},
+  ) {
+    this.geoLookup = createGeoLookup(enrichment.geoLookup);
+    this.asnLookup = enrichment.asnLookup ?? (() => undefined);
+  }
+
+  configureDnsEnrichment(enrichment: StoreEnrichmentOptions): void {
+    if (enrichment.geoLookup !== undefined) this.geoLookup = createGeoLookup(enrichment.geoLookup);
+    if (enrichment.asnLookup !== undefined) this.asnLookup = enrichment.asnLookup;
+  }
 
   createSource(source: SourceRecord): SourceRecord {
     this.db
@@ -1599,31 +1678,48 @@ export class Store {
     };
   }
 
+  private dnsSeries(
+    minutes: number,
+    now: number,
+    window?: ExplicitWindow,
+    qname?: string,
+  ): { series: DnsSummaryDto['series']; from: number; to: number } {
+    const queryWindow = dnsQueryWindow(minutes, now, window);
+    const qnameClause = qname === undefined ? '' : ' AND qname = ?';
+    const params =
+      qname === undefined
+        ? [queryWindow.resolution, queryWindow.resolution, queryWindow.from, queryWindow.to]
+        : [
+            queryWindow.resolution,
+            queryWindow.resolution,
+            queryWindow.from,
+            queryWindow.to,
+            qname,
+          ];
+    const bucketRows = this.db
+      .prepare(
+        `SELECT CAST(ts / ? AS INTEGER) * ? AS bucket, COUNT(*) AS count
+         FROM dns_log WHERE ts >= ? AND ts <= ?${qnameClause}
+         GROUP BY bucket ORDER BY bucket`,
+      )
+      .all(...params) as DnsBucketRow[];
+    const counts = new Map(bucketRows.map((row) => [row.bucket, row.count]));
+    return {
+      series: Array.from({ length: queryWindow.points }, (_, index) => {
+        const ts = queryWindow.start + index * queryWindow.resolution;
+        return { ts, count: counts.get(ts) ?? 0 };
+      }),
+      from: queryWindow.from,
+      to: queryWindow.to,
+    };
+  }
+
   dnsSummary(
     minutes: number,
     now: number = this.now(),
     window?: ExplicitWindow,
   ): DnsSummaryDto {
-    const retainedMinutes = DNS_LOG_RETENTION_MS / MINUTE_MS;
-    const { resolution, points, start } = rollupWindow(
-      window === undefined ? Math.min(minutes, retainedMinutes) : minutes,
-      now,
-      window,
-    );
-    const queryFrom = window?.from ?? start;
-    const queryTo = window?.to ?? now;
-    const bucketRows = this.db
-      .prepare(
-        `SELECT CAST(ts / ? AS INTEGER) * ? AS bucket, COUNT(*) AS count
-         FROM dns_log WHERE ts >= ? AND ts <= ?
-         GROUP BY bucket ORDER BY bucket`,
-      )
-      .all(resolution, resolution, queryFrom, queryTo) as DnsBucketRow[];
-    const counts = new Map(bucketRows.map((row) => [row.bucket, row.count]));
-    const series = Array.from({ length: points }, (_, index) => {
-      const ts = start + index * resolution;
-      return { ts, count: counts.get(ts) ?? 0 };
-    });
+    const { series, from: queryFrom, to: queryTo } = this.dnsSeries(minutes, now, window);
     const topDomains = this.db
       .prepare(
         `SELECT qname, COUNT(*) AS count FROM dns_log
@@ -1643,21 +1739,43 @@ export class Store {
     ];
     let answered = 0;
     for (const row of answerRows) {
-      try {
-        const answers: unknown = JSON.parse(row.answers_json);
-        if (Array.isArray(answers) && answers.length > 0) answered += 1;
-      } catch {}
+      if (row.answers_json !== null) {
+        try {
+          const answers: unknown = JSON.parse(row.answers_json);
+          if (Array.isArray(answers) && answers.length > 0) answered += 1;
+        } catch {}
+      }
       if (row.rtt_ms === null) continue;
       const index = row.rtt_ms < 10 ? 0 : row.rtt_ms < 50 ? 1 : row.rtt_ms < 100 ? 2 : row.rtt_ms < 300 ? 3 : 4;
       rttBuckets[index]!.count += 1;
     }
-    const resolvers = this.db
+    const resolverCounts = this.db
       .prepare(
         `SELECT server, COUNT(*) AS count FROM dns_log
          WHERE ts >= ? AND ts <= ? AND server IS NOT NULL AND trim(server) <> ''
          GROUP BY server ORDER BY count DESC, server LIMIT 6`,
       )
-      .all(queryFrom, queryTo) as DnsSummaryDto['resolvers'];
+      .all(queryFrom, queryTo) as Array<{ server: string; count: number }>;
+    const resolverRtts = this.db
+      .prepare(
+        `SELECT server, rtt_ms FROM dns_log
+         WHERE ts >= ? AND ts <= ? AND server IS NOT NULL AND trim(server) <> ''
+           AND rtt_ms IS NOT NULL`,
+      )
+      .all(queryFrom, queryTo) as DnsResolverRttRow[];
+    const rttsByResolver = new Map<string, number[]>();
+    for (const row of resolverRtts) {
+      const values = rttsByResolver.get(row.server) ?? [];
+      values.push(row.rtt_ms);
+      rttsByResolver.set(row.server, values);
+    }
+    const resolvers: DnsSummaryDto['resolvers'] = resolverCounts.map((resolver) => {
+      const medianRttMs = median(rttsByResolver.get(resolver.server) ?? []);
+      return {
+        ...resolver,
+        ...(medianRttMs === undefined ? {} : { medianRttMs }),
+      };
+    });
     return {
       series,
       topDomains,
@@ -1665,6 +1783,38 @@ export class Store {
       answered,
       unanswered: answerRows.length - answered,
       resolvers,
+    };
+  }
+
+  dnsQnameDetail(
+    qname: string,
+    minutes: number,
+    now: number = this.now(),
+    window?: ExplicitWindow,
+  ): DnsQnameDetail {
+    const { series, from, to } = this.dnsSeries(minutes, now, window, qname);
+    const resolvers = this.db
+      .prepare(
+        `SELECT server, COUNT(*) AS count FROM dns_log
+         WHERE ts >= ? AND ts <= ? AND qname = ? AND server IS NOT NULL AND trim(server) <> ''
+         GROUP BY server ORDER BY count DESC, server`,
+      )
+      .all(from, to, qname) as DnsQnameDetail['resolvers'];
+    const sourceRows = this.db
+      .prepare(
+        `SELECT source, COUNT(*) AS count FROM dns_log
+         WHERE ts >= ? AND ts <= ? AND qname = ? AND source IN ('cache', 'server')
+         GROUP BY source`,
+      )
+      .all(from, to, qname) as Array<{ source: 'cache' | 'server'; count: number }>;
+    const sources = { cache: 0, server: 0 };
+    for (const row of sourceRows) sources[row.source] = row.count;
+    return {
+      qname,
+      total: series.reduce((total, point) => total + point.count, 0),
+      series,
+      resolvers,
+      sources,
     };
   }
 
@@ -2297,12 +2447,70 @@ export class Store {
     return row.count;
   }
 
+  private enrichDnsAnswers(entry: DnsLogEntry): DnsLogEntry {
+    if (entry.answers.length === 0) return entry;
+    const answersMeta: DnsAnswerMeta[] = entry.answers.map((value) => {
+      if (isIP(value) === 0) return { value };
+      const geo = this.geoLookup(value);
+      const asn = this.asnLookup(value);
+      return {
+        value,
+        ...(geo?.country === undefined ? {} : { country: geo.country }),
+        ...(asn === undefined ? {} : { asn: asn.asn, asOrg: asn.org }),
+      };
+    });
+    return { ...entry, answersMeta };
+  }
+
+  private inferDnsDevices(entries: DnsLogEntry[]): DnsLogEntry[] {
+    if (entries.length === 0) return entries;
+    const qnames = [...new Set(entries.map((entry) => entry.qname))];
+    const timestamps = entries.map((entry) => entry.ts);
+    const minTs = Math.min(...timestamps);
+    const maxTs = Math.max(...timestamps);
+    const placeholders = qnames.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(
+        `SELECT f.host, f.device_id, COALESCE(f.started_at, f.ts) AS t, d.name
+         FROM flows f LEFT JOIN devices d ON d.id = f.device_id
+         WHERE f.host IN (${placeholders})
+           AND COALESCE(f.started_at, f.ts) BETWEEN ? AND ?`,
+      )
+      .all(...qnames, minTs - 15_000, maxTs + 90_000) as DnsFlowCandidateRow[];
+    const candidatesByHost = new Map<string, DnsFlowCandidateRow[]>();
+    for (const row of rows) {
+      if (row.device_id === null) continue;
+      const candidates = candidatesByHost.get(row.host) ?? [];
+      candidates.push(row);
+      candidatesByHost.set(row.host, candidates);
+    }
+    return entries.map((entry) => {
+      let nearest: DnsFlowCandidateRow | undefined;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      for (const candidate of candidatesByHost.get(entry.qname) ?? []) {
+        if (candidate.t < entry.ts - 15_000 || candidate.t > entry.ts + 90_000) continue;
+        const distance = Math.abs(candidate.t - entry.ts);
+        if (distance >= nearestDistance) continue;
+        nearest = candidate;
+        nearestDistance = distance;
+      }
+      if (nearest?.device_id === null || nearest?.device_id === undefined) return entry;
+      return {
+        ...entry,
+        inferredDevice: {
+          id: nearest.device_id,
+          name: nearest.name ?? nearest.device_id,
+        },
+      };
+    });
+  }
+
   appendDnsLog(entry: Omit<DnsLogEntry, 'deviceName'>): DnsLogEntry {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO dns_log
-           (id, ts, device_id, qname, answers_json, rtt_ms, server, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, ts, device_id, qname, answers_json, rtt_ms, server, source, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         entry.id,
@@ -2313,6 +2521,7 @@ export class Store {
         entry.rttMs ?? null,
         entry.server ?? null,
         entry.source ?? null,
+        entry.expiresAt ?? null,
       );
     const deviceName =
       entry.deviceId === undefined ? undefined : this.getDeviceById(entry.deviceId)?.name;
@@ -2322,13 +2531,26 @@ export class Store {
     };
   }
 
-  listDnsLog(query: LogsQuery = {}): DnsLogPage {
+  listDnsLog(query: DnsLogsQuery = {}): DnsLogPage {
     const limit = Math.min(200, Math.max(1, Math.floor(query.limit ?? 50)));
     const clauses: string[] = [];
     const params: Array<string | number> = [];
     if (query.search) {
       clauses.push('l.qname LIKE ?');
       params.push(`%${query.search}%`);
+    }
+    if (query.source !== undefined) {
+      clauses.push('l.source = ?');
+      params.push(query.source);
+    }
+    if (query.server !== undefined) {
+      clauses.push('l.server = ?');
+      params.push(query.server);
+    }
+    if (query.unanswered === true) {
+      clauses.push(
+        'CASE WHEN json_valid(l.answers_json) THEN json_array_length(l.answers_json) ELSE 0 END = 0',
+      );
     }
     if (query.cursor) {
       const cursor = decodeCursor(query.cursor);
@@ -2340,7 +2562,7 @@ export class Store {
     const rows = this.db
       .prepare(
         `SELECT l.id, l.ts, l.device_id, d.name AS device_name, l.qname, l.answers_json, l.rtt_ms,
-                l.server, l.source
+                l.server, l.source, l.expires_at
          FROM dns_log l LEFT JOIN devices d ON d.id = l.device_id
          ${where}
          ORDER BY l.ts DESC, l.id DESC LIMIT ?`,
@@ -2348,7 +2570,9 @@ export class Store {
       .all(...params, limit + 1) as DnsLogRow[];
     const hasMore = rows.length > limit;
     const visible = rows.slice(0, limit);
-    const entries = visible.map(dnsLogFromRow);
+    const entries = this.inferDnsDevices(
+      visible.map(dnsLogFromRow).map((entry) => this.enrichDnsAnswers(entry)),
+    );
     const last = visible.at(-1);
     return {
       entries,

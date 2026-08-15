@@ -13,6 +13,7 @@ import { Punchcard } from "@/components/charts/punchcard";
 import { Sparkline } from "@/components/charts/sparkline";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DomainFavicon } from "@/components/ui/domain-favicon";
 import { Empty } from "@/components/ui/empty";
 import { InspectorPanel, InspectorSection } from "@/components/ui/inspector";
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,6 +24,7 @@ import { api, type RangeQuery } from "@/lib/api";
 import { policyColor } from "@/lib/chart-colors";
 import { downsampleCounts } from "@/lib/downsample";
 import { formatBytes, formatTimeAgo } from "@/lib/format";
+import { registrableDomain } from "@/lib/net-labels";
 
 function rejectedRows(rows: BreakdownRow[]) {
   return rows.map((row) => ({
@@ -65,6 +67,8 @@ function MoverCard({
             return {
               key: row.key,
               label: row.label,
+              icon:
+                kind === "domain" ? <DomainFavicon domain={registrableDomain(row.key)} /> : undefined,
               value: row.current,
               valueSub: (
                 <span className="flex items-center justify-end gap-1">
@@ -179,6 +183,7 @@ function PolicyInspector({
             items={destinationRows.map((row) => ({
               key: row.key,
               label: row.key,
+              icon: <DomainFavicon domain={registrableDomain(row.key)} />,
               value: row.bytesIn + row.bytesOut,
               sub: `${row.flows} flows`,
             }))}
@@ -267,7 +272,10 @@ export function InsightsScreen() {
   });
 
   const rejectedBars = downsampleCounts(rejected?.series ?? []);
-  const hostRows = rejectedRows(rejected?.topHosts ?? []);
+  const hostRows = rejectedRows(rejected?.topHosts ?? []).map((row) => ({
+    ...row,
+    icon: <DomainFavicon domain={registrableDomain(row.label)} />,
+  }));
   const deviceRows = rejectedRows(rejected?.topDevices ?? []);
   const ruleRows = rejectedRows(rejected?.topRules ?? []);
   const rejectedEmpty =
@@ -416,6 +424,7 @@ export function InsightsScreen() {
               items={(firstSeen?.domains ?? []).slice(0, 12).map((domain) => ({
                 key: domain.domain,
                 label: domain.domain,
+                icon: <DomainFavicon domain={registrableDomain(domain.domain)} />,
                 sub: `${domain.devices.toLocaleString()} devices`,
                 value: domain.bytes,
                 valueSub: formatTimeAgo(domain.firstTs),

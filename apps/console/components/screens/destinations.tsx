@@ -12,6 +12,7 @@ import type {
 } from "@the-network/schema";
 import { ArrowLeft, Download } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { DonutChart } from "@/components/charts/donut";
@@ -105,12 +106,10 @@ function useDebounced<T>(value: T, ms: number): T {
 function CountriesPanel({
   countries,
   selected,
-  onSelect,
   onClear,
 }: {
   countries: DestinationCountry[];
   selected: string | null;
-  onSelect: (code: string) => void;
   onClear: () => void;
 }) {
   const top = useMemo(
@@ -200,38 +199,27 @@ function CountriesPanel({
             const code = country.code.toUpperCase();
 
             return (
-              <div
+              <Link
                 key={code}
-                className="hover:bg-muted focus-within:ring-ring -mx-2 flex items-stretch rounded-md px-2 py-1.5 transition-colors duration-100 focus-within:ring-2"
+                href={flowHref({ country: code })}
+                className="hover:bg-muted focus-visible:ring-ring -mx-2 block rounded-md px-2 py-1.5 transition-colors duration-100 focus-visible:ring-2 focus-visible:outline-none"
               >
-                <button
-                  type="button"
-                  onClick={() => onSelect(code)}
-                  className="min-w-0 flex-1 text-left focus-visible:outline-none"
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <CountryChip code={code} />
-                    <span className="font-mono text-xs tabular-nums">{formatBytes(bytes)}</span>
+                <div className="flex items-baseline justify-between gap-2">
+                  <CountryChip code={code} />
+                  <span className="font-mono text-xs tabular-nums">{formatBytes(bytes)}</span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <div className="bg-muted h-1 flex-1 overflow-hidden rounded-full">
+                    <div
+                      className="bg-primary/50 h-full rounded-full"
+                      style={{ width: `${Math.max(2, (bytes / maxBytes) * 100)}%` }}
+                    />
                   </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <div className="bg-muted h-1 flex-1 overflow-hidden rounded-full">
-                      <div
-                        className="bg-primary/50 h-full rounded-full"
-                        style={{ width: `${Math.max(2, (bytes / maxBytes) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-muted-foreground text-2xs font-mono tabular-nums">
-                      {country.flows} · {((bytes / totalBytes) * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                </button>
-                <ArrowLink
-                  href={flowHref({ country: code })}
-                  className="focus-visible:ring-ring shrink-0 rounded-md px-2 focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  Flows
-                </ArrowLink>
-              </div>
+                  <span className="text-muted-foreground text-2xs font-mono tabular-nums">
+                    {country.flows} · {((bytes / totalBytes) * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </Link>
             );
           })}
         </div>
@@ -284,7 +272,10 @@ function HostsTable({
               className="hover:bg-muted focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
             >
               <TableCell className="max-w-0 truncate px-4 font-mono text-xs" title={host.host}>
-                {host.host}
+                <span className="flex items-center gap-2">
+                  <DomainFavicon domain={domain} />
+                  <span className="truncate">{host.host}</span>
+                </span>
               </TableCell>
               <TableCell>
                 {host.country ? (
@@ -376,7 +367,6 @@ function MapTab({
         <CountriesPanel
           countries={countries}
           selected={selected}
-          onSelect={onSelectCountry}
           onClear={onClearCountry}
         />
       </div>

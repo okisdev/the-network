@@ -92,11 +92,16 @@ describe('Store', () => {
         lat: 'REAL',
         lon: 'REAL',
       });
-      expect(
-        (legacyDb.prepare('PRAGMA table_info(dns_log)').all() as Array<{ name: string }>).map(
-          (column) => column.name,
+      const dnsColumns = new Map(
+        (legacyDb.prepare('PRAGMA table_info(dns_log)').all() as Array<{ name: string; type: string }>).map(
+          (column) => [column.name, column.type],
         ),
-      ).toEqual(expect.arrayContaining(['server', 'source']));
+      );
+      expect(Object.fromEntries(dnsColumns)).toMatchObject({
+        server: 'TEXT',
+        source: 'TEXT',
+        expires_at: 'INTEGER',
+      });
       expect(
         legacyDb
           .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'presence_log_open_idx'")
@@ -376,7 +381,7 @@ describe('Store', () => {
     expect(second.nextCursor).toBeUndefined();
   });
 
-  it('roundtrips DNS resolver fields', () => {
+  it('roundtrips DNS resolver and expiry fields', () => {
     store.upsertDevice({
       id: 'device-1',
       name: 'Laptop',
@@ -392,10 +397,170 @@ describe('Store', () => {
       rttMs: 12,
       server: '1.1.1.1',
       source: 'server',
+      expiresAt: NOW + 60_000,
     });
 
-    expect(entry).toMatchObject({ server: '1.1.1.1', source: 'server', deviceName: 'Laptop' });
-    expect(store.listDnsLog().entries).toEqual([entry]);
+    store.configureDnsEnrichment({ geoLookup: () => undefined, asnLookup: () => undefined });
+    expect(entry).toMatchObject({
+      server: '1.1.1.1',
+      source: 'server',
+      expiresAt: NOW + 60_000,
+      deviceName: 'Laptop',
+    });
+    expect(store.listDnsLog().entries).toEqual([
+      { ...entry, answersMeta: [{ value: '93.184.216.34' }] },
+    ]);
+  });
+
+  it('composes DNS source, server, unanswered, and cursor filters', () => {
+    for (const entry of [
+      {
+        id: 'server-new',
+        ts: NOW,
+        qname: 'new.example',
+        answers: [],
+        server: '1.1.1.1',
+        source: 'server' as const,
+      },
+      {
+        id: 'server-old',
+        ts: NOW - 1_000,
+        qname: 'old.example',
+        answers: [],
+        server: '1.1.1.1',
+        source: 'server' as const,
+      },
+      {
+        id: 'answered',
+        ts: NOW - 2_000,
+        qname: 'answered.example',
+        answers: ['8.8.8.8'],
+        server: '1.1.1.1',
+        source: 'server' as const,
+      },
+      {
+        id: 'cache',
+        ts: NOW - 3_000,
+        qname: 'cache.example',
+        answers: [],
+        server: 'system',
+        source: 'cache' as const,
+      },
+    ]) {
+      store.appendDnsLog(entry);
+    }
+
+    expect(store.listDnsLog({ source: 'cache' }).entries.map((entry) => entry.id)).toEqual(['cache']);
+    expect(store.listDnsLog({ server: 'system' }).entries.map((entry) => entry.id)).toEqual(['cache']);
+    expect(store.listDnsLog({ unanswered: true }).entries.map((entry) => entry.id)).toEqual([
+      'server-new',
+      'server-old',
+      'cache',
+    ]);
+    const first = store.listDnsLog({ source: 'server', server: '1.1.1.1', unanswered: true, limit: 1 });
+    expect(first.entries.map((entry) => entry.id)).toEqual(['server-new']);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    expect(
+      store.listDnsLog({
+        source: 'server',
+        server: '1.1.1.1',
+        unanswered: true,
+        cursor: first.nextCursor,
+        limit: 1,
+      }).entries.map((entry) => entry.id),
+    ).toEqual(['server-old']);
+  });
+
+  it('aligns DNS answer metadata and infers the nearest flow device in one page window', () => {
+    for (const [id, name] of [
+      ['recorded-device', 'Recorded'],
+      ['farther-device', 'Farther'],
+      ['nearest-device', 'Nearest'],
+      ['outside-device', 'Outside'],
+    ] as const) {
+      store.upsertDevice({ id, name, firstSeenAt: NOW - 100_000, lastSeenAt: NOW });
+    }
+    const unmatchedTs = NOW - 60_000;
+    store.writeFlush({
+      flows: [
+        {
+          id: 'farther-flow',
+          sourceId: 'source-1',
+          deviceId: 'farther-device',
+          ts: NOW - 100_000,
+          startedAt: NOW - 5_000,
+          host: 'target.example',
+          bytesIn: 0,
+          bytesOut: 0,
+          state: 'completed',
+        },
+        {
+          id: 'nearest-flow',
+          sourceId: 'source-1',
+          deviceId: 'nearest-device',
+          ts: NOW - 100_000,
+          startedAt: NOW + 2_000,
+          host: 'target.example',
+          bytesIn: 0,
+          bytesOut: 0,
+          state: 'completed',
+        },
+        {
+          id: 'outside-flow',
+          sourceId: 'source-1',
+          deviceId: 'outside-device',
+          ts: NOW - 100_000,
+          startedAt: unmatchedTs + 90_001,
+          host: 'unmatched.example',
+          bytesIn: 0,
+          bytesOut: 0,
+          state: 'completed',
+        },
+      ],
+    });
+    store.configureDnsEnrichment({
+      geoLookup: (ip) =>
+        ip === '8.8.8.8' || ip === '2001:4860:4860::8888' ? 'US' : undefined,
+      asnLookup: (ip) =>
+        ip === '8.8.8.8' || ip === '2001:4860:4860::8888'
+          ? { asn: 15_169, org: 'Google LLC' }
+          : undefined,
+    });
+    store.appendDnsLog({
+      id: 'matched-dns',
+      ts: NOW,
+      deviceId: 'recorded-device',
+      qname: 'target.example',
+      answers: ['8.8.8.8', 'alias.example', '2001:4860:4860::8888'],
+    });
+    store.appendDnsLog({
+      id: 'unmatched-dns',
+      ts: unmatchedTs,
+      qname: 'unmatched.example',
+      answers: [],
+    });
+
+    const entries = store.listDnsLog().entries;
+    const matched = entries.find((entry) => entry.id === 'matched-dns');
+    const unmatched = entries.find((entry) => entry.id === 'unmatched-dns');
+    expect(matched).toMatchObject({
+      deviceId: 'recorded-device',
+      deviceName: 'Recorded',
+      inferredDevice: { id: 'nearest-device', name: 'Nearest' },
+    });
+    expect(matched?.answersMeta).toEqual([
+      { value: '8.8.8.8', country: 'US', asn: 15_169, asOrg: 'Google LLC' },
+      { value: 'alias.example' },
+      {
+        value: '2001:4860:4860::8888',
+        country: 'US',
+        asn: 15_169,
+        asOrg: 'Google LLC',
+      },
+    ]);
+    expect(matched?.answersMeta).toHaveLength(matched?.answers.length ?? 0);
+    expect(unmatched).not.toHaveProperty('inferredDevice');
+    expect(unmatched).not.toHaveProperty('answersMeta');
   });
 
   it('summarizes DNS buckets, answers, response times, and resolvers within retention', () => {
@@ -428,8 +593,8 @@ describe('Store', () => {
       answered: 2,
       unanswered: 4,
       resolvers: [
-        { server: '1.1.1.1', count: 3 },
-        { server: '8.8.8.8', count: 2 },
+        { server: '1.1.1.1', count: 3, medianRttMs: 10 },
+        { server: '8.8.8.8', count: 2, medianRttMs: 200 },
       ],
     });
     const retained = store.dnsSummary(525_600, NOW).series;

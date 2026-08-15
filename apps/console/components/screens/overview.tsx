@@ -15,6 +15,7 @@ import { ArrowLink } from "@/components/ui/arrow-link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DomainFavicon } from "@/components/ui/domain-favicon";
 import { Empty } from "@/components/ui/empty";
 import { PageHeader } from "@/components/ui/page-header";
 import { RowList } from "@/components/ui/row-list";
@@ -27,6 +28,7 @@ import { api } from "@/lib/api";
 import { CHART_SLOTS, colorForKey, policyColor } from "@/lib/chart-colors";
 import { downsampleCounts } from "@/lib/downsample";
 import { formatBytes, formatRate, formatTime, formatTimeAgo } from "@/lib/format";
+import { registrableDomain } from "@/lib/net-labels";
 import { cn } from "@/lib/utils";
 
 type ThroughputMode = "total" | "devices" | "policies";
@@ -209,6 +211,7 @@ export function OverviewScreen() {
   const destinationRows = (destinationBreakdown?.rows ?? []).map((row) => ({
     key: row.key,
     label: row.key,
+    icon: <DomainFavicon domain={registrableDomain(row.key)} />,
     value: row.bytesIn + row.bytesOut,
     sub: `${row.flows.toLocaleString()} flows`,
     color: colorForKey(row.key),
@@ -542,6 +545,7 @@ export function OverviewScreen() {
                 items={(dns?.topDomains ?? []).slice(0, 5).map((domain) => ({
                   key: domain.qname,
                   label: domain.qname,
+                  icon: <DomainFavicon domain={registrableDomain(domain.qname)} />,
                   value: domain.count,
                 }))}
               />
@@ -601,6 +605,7 @@ export function OverviewScreen() {
                 items={(rejected?.topHosts ?? []).slice(0, 5).map((host) => ({
                   key: host.key,
                   label: host.label ?? host.key,
+                  icon: <DomainFavicon domain={registrableDomain(host.label ?? host.key)} />,
                   value: host.flows,
                 }))}
               />

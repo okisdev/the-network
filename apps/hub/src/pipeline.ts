@@ -228,6 +228,7 @@ export class Pipeline {
               ...(event.rttMs === undefined ? {} : { rttMs: event.rttMs }),
               ...(event.server === undefined ? {} : { server: event.server }),
               ...(event.source === undefined ? {} : { source: event.source }),
+              ...(event.expiresAt === undefined ? {} : { expiresAt: event.expiresAt }),
             }),
           );
           break;

@@ -8,6 +8,7 @@ const entrySchema = z
     domain: z.string().trim().min(1),
     data: z.array(z.string()).catch([]).default([]),
     timeCost: z.number().finite().optional(),
+    expiresTime: z.number().finite().optional(),
     server: z.string().optional(),
     source: z.string().optional(),
   })
@@ -36,6 +37,9 @@ export function mapDnsCache(payload: unknown, nowMs: number): DnsEvent[] {
       ...(entry.data.timeCost === undefined
         ? {}
         : { rttMs: Math.round(entry.data.timeCost * 1_000) }),
+      ...(entry.data.expiresTime === undefined
+        ? {}
+        : { expiresAt: Math.round(entry.data.expiresTime * 1_000) }),
       ...(entry.data.server !== undefined && entry.data.server !== ''
         ? { server: entry.data.server }
         : {}),
