@@ -1,0 +1,10 @@
+# The Network: Netflix
+#
+# Expects a streaming policy.
+
+DOMAIN-SUFFIX,fast.com
+DOMAIN-SUFFIX,netflix.com
+DOMAIN-SUFFIX,netflix.net
+DOMAIN-SUFFIX,nflxext.com
+DOMAIN-SUFFIX,nflxso.net
+DOMAIN-SUFFIX,nflxvideo.net

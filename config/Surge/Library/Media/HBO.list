@@ -1,0 +1,10 @@
+# The Network: HBO
+#
+# Expects a streaming policy.
+
+DOMAIN-SUFFIX,hbo.com
+DOMAIN-SUFFIX,hbogo.com
+DOMAIN-SUFFIX,hbomax.com
+DOMAIN-SUFFIX,hbonow.com
+DOMAIN-SUFFIX,max.com
+DOMAIN-SUFFIX,warnermediacdn.com

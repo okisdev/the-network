@@ -1,0 +1,18 @@
+# The Network: Downloads
+#
+# Expects DIRECT.
+#
+# Domestic download and netdisk fronts. BlockedDirect in the overlay must precede this file.
+
+DOMAIN-SUFFIX,123pan.com
+DOMAIN-SUFFIX,alipan.com
+DOMAIN-SUFFIX,aliyundrive.com
+DOMAIN-SUFFIX,baidupcs.com
+DOMAIN-SUFFIX,lanzoui.com
+DOMAIN-SUFFIX,lanzoux.com
+DOMAIN-SUFFIX,pan.baidu.com
+DOMAIN-SUFFIX,quark.cn
+DOMAIN-SUFFIX,thunderurl.com
+DOMAIN-SUFFIX,weiyun.com
+DOMAIN-SUFFIX,wenshushu.cn
+DOMAIN-SUFFIX,xunlei.com

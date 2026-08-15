@@ -1,0 +1,20 @@
+# The Network: HTTP DNS
+#
+# Expects REJECT.
+#
+# Stops mainland apps from bypassing the gateway resolver. If an app fails closed instead of falling back, that host belongs in Rescue.
+
+DOMAIN-SUFFIX,httpdns.platform.dbankcloud.cn
+DOMAIN-SUFFIX,httpdns.platform.dbankcloud.com
+DOMAIN,dns.weixin.qq.com
+DOMAIN,dns.weixin.qq.com.cn
+DOMAIN,httpdns.alicdn.com
+DOMAIN,httpdns.aliyuncs.com
+DOMAIN,httpdns.baidu.com
+DOMAIN,httpdns.baidubce.com
+DOMAIN,httpdns.bilivideo.com
+DOMAIN,httpdns.huaweicloud.com
+DOMAIN,httpdns.meituan.com
+DOMAIN,httpdns.music.163.com
+DOMAIN,httpdns.n.netease.com
+DOMAIN,httpdns.volcengineapi.com

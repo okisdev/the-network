@@ -1,0 +1,8 @@
+# The Network: HoYoverse
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,hoyolab.com
+DOMAIN-SUFFIX,hoyoverse.com
+DOMAIN-SUFFIX,mihoyo.com
+DOMAIN-SUFFIX,yuanshen.com

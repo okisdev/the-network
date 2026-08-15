@@ -1,0 +1,19 @@
+# The Network: ByteDance
+#
+# Expects Domestic.
+#
+# TikTok international stays in Media/TikTok and expects a streaming policy.
+
+DOMAIN-SUFFIX,byted.org
+DOMAIN-SUFFIX,bytedance.com
+DOMAIN-SUFFIX,douyin.com
+DOMAIN-SUFFIX,douyincdn.com
+DOMAIN-SUFFIX,feishu.cn
+DOMAIN-SUFFIX,iesdouyin.com
+DOMAIN-SUFFIX,ixigua.com
+DOMAIN-SUFFIX,larksuite.com
+DOMAIN-SUFFIX,snssdk.com
+DOMAIN-SUFFIX,toutiao.com
+DOMAIN-SUFFIX,toutiaoapi.com
+DOMAIN-SUFFIX,volccdn.com
+DOMAIN-SUFFIX,volces.com

@@ -1,0 +1,9 @@
+# The Network: NetEase
+#
+# Expects Domestic.
+
+DOMAIN-SUFFIX,126.com
+DOMAIN-SUFFIX,127.net
+DOMAIN-SUFFIX,163.com
+DOMAIN-SUFFIX,netease.com
+DOMAIN-SUFFIX,yeah.net

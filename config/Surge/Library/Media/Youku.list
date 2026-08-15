@@ -1,0 +1,7 @@
+# The Network: Youku
+#
+# Expects Domestic.
+
+DOMAIN-SUFFIX,soku.com
+DOMAIN-SUFFIX,ykimg.com
+DOMAIN-SUFFIX,youku.com

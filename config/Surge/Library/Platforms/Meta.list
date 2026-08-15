@@ -1,0 +1,14 @@
+# The Network: Meta
+#
+# Expects Proxy.
+#
+# Facebook and Instagram have their own files. This is the company remainder, including WhatsApp delivery.
+
+DOMAIN-SUFFIX,facebook.com
+DOMAIN-SUFFIX,fb.com
+DOMAIN-SUFFIX,instagram.com
+DOMAIN-SUFFIX,meta.com
+DOMAIN-SUFFIX,oculus.com
+DOMAIN-SUFFIX,oculuscdn.com
+DOMAIN-SUFFIX,threads.net
+DOMAIN-SUFFIX,whatsapp.com

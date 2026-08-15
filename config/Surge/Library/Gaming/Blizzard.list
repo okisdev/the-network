@@ -1,0 +1,7 @@
+# The Network: Blizzard
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,battle.net
+DOMAIN-SUFFIX,battlenet.com.cn
+DOMAIN-SUFFIX,blizzard.com

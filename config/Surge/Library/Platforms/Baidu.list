@@ -1,0 +1,9 @@
+# The Network: Baidu
+#
+# Expects Domestic.
+
+DOMAIN-SUFFIX,baidu.com
+DOMAIN-SUFFIX,baidubce.com
+DOMAIN-SUFFIX,baidupcs.com
+DOMAIN-SUFFIX,bdimg.com
+DOMAIN-SUFFIX,bdstatic.com

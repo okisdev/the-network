@@ -1,0 +1,13 @@
+# The Network: WeChat
+#
+# Expects Domestic.
+#
+# The messenger subset, so it can be steered without the rest of Tencent.
+
+DOMAIN-SUFFIX,servicewechat.com
+DOMAIN-SUFFIX,wechat.com
+DOMAIN-SUFFIX,wechatlegal.com
+DOMAIN-SUFFIX,wechatpay.com
+DOMAIN-SUFFIX,weixin.com
+DOMAIN-SUFFIX,weixin.qq.com
+DOMAIN-SUFFIX,weixinbridge.com

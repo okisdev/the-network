@@ -1,0 +1,7 @@
+# The Network: Xbox
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,gamepass.com
+DOMAIN-SUFFIX,xbox.com
+DOMAIN-SUFFIX,xboxlive.com

@@ -1,0 +1,7 @@
+# The Network: Docker
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,docker.com
+DOMAIN-SUFFIX,docker.io
+DOMAIN-SUFFIX,dockerhub.com

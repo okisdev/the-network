@@ -1,0 +1,10 @@
+# The Network: Atlassian
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,atlassian.com
+DOMAIN-SUFFIX,atlassian.net
+DOMAIN-SUFFIX,bitbucket.org
+DOMAIN-SUFFIX,jira.com
+DOMAIN-SUFFIX,statuspage.io
+DOMAIN-SUFFIX,trello.com

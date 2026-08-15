@@ -1,0 +1,7 @@
+# The Network: GitLab
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,gitlab.com
+DOMAIN-SUFFIX,gitlab.io
+DOMAIN-SUFFIX,gitlab.net

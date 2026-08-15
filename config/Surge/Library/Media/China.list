@@ -1,0 +1,33 @@
+# The Network: China media
+#
+# Expects Domestic.
+#
+# Domestic video and audio that should not leave through a foreign exit.
+
+DOMAIN-SUFFIX,bilibili.cn
+DOMAIN-SUFFIX,bilibili.com
+DOMAIN-SUFFIX,bilivideo.com
+DOMAIN-SUFFIX,cctv.com
+DOMAIN-SUFFIX,cntv.cn
+DOMAIN-SUFFIX,douyin.com
+DOMAIN-SUFFIX,douyincdn.com
+DOMAIN-SUFFIX,hdslb.com
+DOMAIN-SUFFIX,hunantv.com
+DOMAIN-SUFFIX,iqiyi.com
+DOMAIN-SUFFIX,ixigua.com
+DOMAIN-SUFFIX,kuaishou.com
+DOMAIN-SUFFIX,kugou.com
+DOMAIN-SUFFIX,kuwo.cn
+DOMAIN-SUFFIX,le.com
+DOMAIN-SUFFIX,mgtv.com
+DOMAIN-SUFFIX,music.163.com
+DOMAIN-SUFFIX,pptv.com
+DOMAIN-SUFFIX,qqmusic.qq.com
+DOMAIN-SUFFIX,sohu.com
+DOMAIN-SUFFIX,sohucs.com
+DOMAIN-SUFFIX,v.qq.com
+DOMAIN-SUFFIX,video.qq.com
+DOMAIN-SUFFIX,wetv.vip
+DOMAIN-SUFFIX,y.qq.com
+DOMAIN-SUFFIX,youku.com
+DOMAIN-SUFFIX,yximgs.com

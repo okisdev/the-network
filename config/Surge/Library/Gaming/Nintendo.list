@@ -1,0 +1,8 @@
+# The Network: Nintendo
+#
+# Expects a gaming policy.
+
+DOMAIN-SUFFIX,nintendo-europe.com
+DOMAIN-SUFFIX,nintendo.com
+DOMAIN-SUFFIX,nintendo.net
+DOMAIN-SUFFIX,nintendowifi.net

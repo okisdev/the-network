@@ -1,0 +1,26 @@
+# The Network: Proxy cores
+#
+# Expects DIRECT.
+#
+# Prevents the gateway from proxying another proxy process on the same machine.
+
+PROCESS-NAME,brook
+PROCESS-NAME,clash
+PROCESS-NAME,Clash Meta
+PROCESS-NAME,ClashX
+PROCESS-NAME,ClashX Pro
+PROCESS-NAME,hysteria
+PROCESS-NAME,hysteria2
+PROCESS-NAME,leaf
+PROCESS-NAME,mihomo
+PROCESS-NAME,naive
+PROCESS-NAME,privoxy
+PROCESS-NAME,sing-box
+PROCESS-NAME,ss-local
+PROCESS-NAME,surge
+PROCESS-NAME,Surge
+PROCESS-NAME,Surge-CLI
+PROCESS-NAME,trojan
+PROCESS-NAME,trojan-go
+PROCESS-NAME,v2ray
+PROCESS-NAME,xray

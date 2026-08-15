@@ -1,0 +1,18 @@
+# The Network: Microsoft
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,1drv.com
+DOMAIN-SUFFIX,azure.com
+DOMAIN-SUFFIX,live.com
+DOMAIN-SUFFIX,live.net
+DOMAIN-SUFFIX,microsoft.com
+DOMAIN-SUFFIX,microsoftonline.com
+DOMAIN-SUFFIX,msftconnecttest.com
+DOMAIN-SUFFIX,msn.com
+DOMAIN-SUFFIX,office.com
+DOMAIN-SUFFIX,office365.com
+DOMAIN-SUFFIX,onedrive.com
+DOMAIN-SUFFIX,outlook.com
+DOMAIN-SUFFIX,sharepoint.com
+DOMAIN-SUFFIX,windows.net

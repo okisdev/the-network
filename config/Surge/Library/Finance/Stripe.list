@@ -1,0 +1,8 @@
+# The Network: Stripe
+#
+# Expects Proxy.
+
+DOMAIN-SUFFIX,link.com
+DOMAIN-SUFFIX,stripe.com
+DOMAIN-SUFFIX,stripe.network
+DOMAIN-SUFFIX,stripecdn.com
