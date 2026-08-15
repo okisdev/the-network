@@ -1,6 +1,6 @@
 # The Network: Telegram
 #
-# Expects Proxy.
+# Expects Telegram.
 #
 # Pair with Geo/TelegramCIDR.list for clients that skip SNI.
 

@@ -1,8 +1,8 @@
 # The Network: Speedtest
 #
-# Expects DIRECT.
+# Expects Proxy.
 #
-# Measurement endpoints. Proxying them measures the exit, not the line.
+# On a hijacking gateway these measure the selected exit. DIRECT would measure the last mile instead.
 
 DOMAIN-SUFFIX,ookla.com
 DOMAIN-SUFFIX,speed.cloudflare.com

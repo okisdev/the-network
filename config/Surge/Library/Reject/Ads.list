@@ -1,8 +1,8 @@
 # The Network: Ads
 #
-# Expects REJECT.
+# Expects AdBlock.
 #
-# Known advertising hosts. Keep Rescue ahead of this file. Analytics and crash reporters stay out.
+# Known advertising hosts. Keep Rescue ahead of this file. Analytics and crash reporters stay out. Hang this on the AdBlock group so it can be flipped off.
 
 DOMAIN-SUFFIX,2mdn.net
 DOMAIN-SUFFIX,adform.net

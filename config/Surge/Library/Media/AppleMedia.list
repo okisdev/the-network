@@ -1,8 +1,8 @@
 # The Network: Apple media
 #
-# Expects a streaming policy.
+# Expects Proxy.
 #
-# Music, TV, and podcasts. Push and iCloud content stay in the overlay.
+# Music, TV, and podcasts. Push and iCloud content stay in the overlay. Store and update-check hosts live in Platforms/AppleServices.list.
 
 DOMAIN-SUFFIX,applemusic.com
 DOMAIN-SUFFIX,podcasts.apple.com

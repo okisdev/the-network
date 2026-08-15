@@ -1,6 +1,8 @@
 # The Network: Microsoft
 #
-# Expects Proxy.
+# Expects Microsoft.
+#
+# Large-file CDNs live in Platforms/MicrosoftCDN.list and must precede this file. microsoft.com would otherwise swallow them.
 
 DOMAIN-SUFFIX,1drv.com
 DOMAIN-SUFFIX,azure.com

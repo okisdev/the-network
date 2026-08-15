@@ -15,31 +15,39 @@ RULE-SET,<base>/config/Surge/Rescue/BlockedDirect.list,Proxy
 RULE-SET,<base>/config/Surge/AI/AI.list,AI Suite,extended-matching
 RULE-SET,<base>/config/Surge/GitHub/GitHub.list,🇯🇵 JP
 
-# Library. Process names, then reject, then services, then GEOIP, then IPs.
+# Library. Policies match the panel groups: AdBlock, Netflix, Telegram, Microsoft, Others.
 RULE-SET,<base>/config/Surge/Library/Process/ProxyCores.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Process/Downloaders.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Direct/Private.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Geo/LAN.list,DIRECT
-RULE-SET,<base>/config/Surge/Library/Reject/HttpDNS.list,REJECT
-RULE-SET,<base>/config/Surge/Library/Reject/Ads.list,REJECT
+RULE-SET,<base>/config/Surge/Library/Reject/HttpDNS.list,AdBlock
+RULE-SET,<base>/config/Surge/Library/Reject/Ads.list,AdBlock
 RULE-SET,<base>/config/Surge/Library/Direct/NTP.list,DIRECT
-RULE-SET,<base>/config/Surge/Library/Direct/Speedtest.list,DIRECT
+RULE-SET,<base>/config/Surge/Library/Direct/Speedtest.list,Proxy
 RULE-SET,<base>/config/Surge/Library/Direct/Download.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Direct/CDNChina.list,DIRECT
-RULE-SET,<base>/config/Surge/Library/Social/Telegram.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Social/Discord.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Social/X.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Media/Netflix.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Media/YouTube.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Media/Disney.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Media/Spotify.list,Proxy
-RULE-SET,<base>/config/Surge/Library/Media/TikTok.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Direct/AppleCDN.list,DIRECT
+RULE-SET,<base>/config/Surge/Library/Media/AppleMedia.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Platforms/AppleServices.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Platforms/MicrosoftCDN.list,DIRECT
+RULE-SET,<base>/config/Surge/Library/Platforms/Microsoft.list,Microsoft,extended-matching
+RULE-SET,<base>/config/Surge/Library/Social/Telegram.list,Telegram,extended-matching
+RULE-SET,<base>/config/Surge/Library/Social/Discord.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Social/X.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Social/WhatsApp.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Media/Netflix.list,Netflix,extended-matching
+RULE-SET,<base>/config/Surge/Library/Media/YouTube.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Media/Disney.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Media/Spotify.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Media/TikTok.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Media/China.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Gaming/Steam.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Platforms/Google.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Platforms/ByteDance.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/Tencent.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/Alibaba.list,Domestic
-RULE-SET,<base>/config/Surge/Library/Geo/TelegramCIDR.list,Proxy
-GEOIP,CN,Domestic
+RULE-SET,<base>/config/Surge/Library/Proxy/DoH.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Geo/TelegramCIDR.list,Telegram
 RULE-SET,LAN,DIRECT
-FINAL,Proxy,dns-failed
+GEOIP,CN,Domestic
+FINAL,Others,dns-failed

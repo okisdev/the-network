@@ -1,8 +1,8 @@
 # The Network: HTTP DNS
 #
-# Expects REJECT.
+# Expects AdBlock.
 #
-# Stops mainland apps from bypassing the gateway resolver. If an app fails closed instead of falling back, that host belongs in Rescue.
+# Stops mainland apps from bypassing the gateway resolver. Hang this on the AdBlock group so it can be flipped off. If an app fails closed instead of falling back, that host belongs in Rescue.
 
 DOMAIN-SUFFIX,httpdns.platform.dbankcloud.cn
 DOMAIN-SUFFIX,httpdns.platform.dbankcloud.com
