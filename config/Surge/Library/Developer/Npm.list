@@ -1,6 +1,6 @@
 # The Network: npm
 #
-# Expects Proxy.
+# Expects Proxy. Must follow Direct/Registries.list, which owns the registry hosts under these suffixes.
 
 DOMAIN-SUFFIX,npm.cloudflare.com
 DOMAIN-SUFFIX,npmjs.com

@@ -4,7 +4,7 @@
 #
 # Download classification exists to keep large transfers on domestic CDNs at line speed, and it treats these as download hosts. They are also blocked here, so direct means dead rather than fast.
 #
-# ghcr.io belongs to this category too but lives in config/Surge/GitHub/GitHub.list, so that it shares an exit with the rest of GitHub.
+# ghcr.io and formulae.brew.sh belong to this category too but live in config/Surge/GitHub/GitHub.list, so that they share an exit with the rest of GitHub. Working official registries that should stay DIRECT live in config/Surge/Library/Direct/Registries.list.
 
 DOMAIN-SUFFIX,mega.nz
 DOMAIN-SUFFIX,mega.co.nz
