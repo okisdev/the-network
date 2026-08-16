@@ -1,6 +1,6 @@
 # Library index
 
-79 first-party rule sets. Policy names match the panel groups.
+80 first-party rule sets. Policy names match the panel groups.
 
 ### Reject
 
@@ -17,6 +17,7 @@
 | [`Direct/CDNChina.list`](Direct/CDNChina.list) | China CDN | DIRECT | 23 |
 | [`Direct/AppleCDN.list`](Direct/AppleCDN.list) | Apple CDN | DIRECT | 8 |
 | [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 16 |
+| [`Direct/Registries.list`](Direct/Registries.list) | Package registries | DIRECT | 19 |
 | [`Direct/NTP.list`](Direct/NTP.list) | NTP | DIRECT | 11 |
 | [`Direct/Speedtest.list`](Direct/Speedtest.list) | Speedtest | Proxy | 5 |
 

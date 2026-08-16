@@ -53,6 +53,8 @@ Apple is three library files plus the overlay: `Direct/AppleCDN.list` DIRECT, `M
 
 Microsoft is `Platforms/MicrosoftCDN.list` DIRECT then `Platforms/Microsoft.list` on the Microsoft group.
 
+Official package registries are `Direct/Registries.list` DIRECT and must precede `Developer/Npm.list`, the same split as the CDN files.
+
 Service lists that clients may hit as a bare IP plus SNI are referenced with `extended-matching`.
 
 ## Categories the overlay takes over
@@ -76,6 +78,8 @@ One behaviour is deliberate: `api.github.com` is ordinary GitHub API traffic and
 
 - Overlay precedes library. A repair rule placed behind the classification it is repairing does nothing.
 - `Tailscale/Coordination.list` precedes `Tailscale/Direct.list`, because the coordination hosts are covered by the `tailscale.com` suffix in the second file.
+- `GitHub/GitHub.list` precedes `Library/Direct/Registries.list`, so a GitHub-hosted registry that appears in both keeps the Japan pin instead of falling through to DIRECT.
+- `Library/Direct/Registries.list` precedes `Library/Developer/Npm.list`, so `registry.npmjs.org` stays DIRECT instead of matching the npmjs.org suffix.
 - Process names, reject, and service lists stay above `GEOIP`.
 - IP rules stay below every domain rule in the profile as a whole. The address rules in the overlay and in `Library/Geo/` all carry `no-resolve`.
 - `Library/Geo/LAN.list` does not carry `100.64.0.0/10`. That range belongs to `Tailscale/Tailnet.list`.
