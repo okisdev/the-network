@@ -10,11 +10,13 @@
 #
 # The fault is intermittent. Hong Kong recovered on its own about half an hour later for github.com while still failing 2 of 20 on the githubusercontent hosts, so a clean spot check does not mean the pin can be removed.
 #
-# ghcr.io lives here rather than in Rescue/BlockedDirect.list: it needs a proxy anyway because download classification would send it direct, and it is GitHub, so it should share their exit.
+# ghcr.io lives here rather than in Rescue/BlockedDirect.list or Library/Direct/Registries.list: it needs a proxy anyway because download classification would send it direct, and it is GitHub, so it should share their exit.
 #
-# github.io is deliberately absent. GitHub Pages is served from different infrastructure and was not part of the measurement.
+# formulae.brew.sh is a GitHub Pages custom domain (CNAME homebrew.github.io). Download classification sends it DIRECT, which is why it cannot stay with brew.sh and docs.brew.sh or with Library/Direct/Registries.list. Measured 2026-08-16: three fresh fetches of the 34MB formula.jws.json index each timed out at 90s after 5.8 to 8.8MB (64 to 98kB/s); the same file through Japan finished in 1.28 to 1.39s (24 to 27MB/s). The 21MB cask.jws.json index timed out the same way DIRECT and finished in 2.14s through Japan. brew.sh and docs.brew.sh already reach a proxy through CDN classification, so they stay out of this list.
 #
-# Release assets and Copilot result blobs sit on S3 and Azure, not on the four suffixes above. Unpinned they fall through to FINAL, which is the default proxy group and is often Hong Kong, the path that fails.
+# github.io is deliberately absent. GitHub Pages is served from different infrastructure and was not part of the github.com handshake measurement; the Pages custom domain above is pinned on its own evidence.
+#
+# Release assets and Copilot result blobs sit on S3 and Azure, not on the suffixes above. Unpinned they fall through to FINAL, which is the default proxy group and is often Hong Kong, the path that fails.
 
 DOMAIN-SUFFIX,github.com
 DOMAIN-SUFFIX,githubassets.com
@@ -22,6 +24,7 @@ DOMAIN-SUFFIX,githubusercontent.com
 DOMAIN-SUFFIX,githubapp.com
 DOMAIN-SUFFIX,githubnext.com
 DOMAIN-SUFFIX,ghcr.io
+DOMAIN-SUFFIX,formulae.brew.sh
 DOMAIN,github-cloud.s3.amazonaws.com
 DOMAIN-WILDCARD,github-production-*.s3.amazonaws.com
 DOMAIN,copilotprodattachments.blob.core.windows.net
