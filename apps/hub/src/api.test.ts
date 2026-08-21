@@ -199,6 +199,25 @@ describe('Hub API', () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it('evicts the oldest favicon negative-cache entry beyond capacity', async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      new Response('missing', { status: 404, headers: { 'content-type': 'text/plain' } }));
+    await recreateApp({ fetch: fetchMock as typeof fetch });
+
+    // Miss the first host, then flood with FAVICON_MISSES_MAX other misses so the
+    // first host's negative entry is the one evicted.
+    await app.inject({ method: 'GET', url: '/api/favicon/first.example' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    for (let i = 0; i < 1_000; i += 1) {
+      await app.inject({ method: 'GET', url: `/api/favicon/host-${i}.example` });
+    }
+    // first.example's negative entry was evicted, so its second request fetches
+    // again (and fails, re-entering the cache) instead of short-circuiting.
+    await app.inject({ method: 'GET', url: '/api/favicon/first.example' });
+    expect(fetchMock).toHaveBeenCalledTimes(1 + 1_000);
+  });
+
   it('rejects invalid favicon domains before fetching', async () => {
     const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
       new Response(null, { status: 200, headers: { 'content-type': 'image/png' } }));

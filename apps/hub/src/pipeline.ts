@@ -21,6 +21,10 @@ import { Store } from './store.ts';
 const EWMA_ALPHA = 0.35;
 const RATE_IDLE_MS = 10_000;
 const DEVICE_ONLINE_MS = 120_000;
+// Flows are cumulative counters from the gateway; reject non-finite or unsafe
+// magnitudes before they can poison rollups (a runaway counter once produced a
+// 3.6e19 total in the upstream data this tool imports from).
+const MAX_FLOW_BYTES = Number.MAX_SAFE_INTEGER;
 
 interface RegistryRow extends FlowWrite {
   deviceName: string;
@@ -195,6 +199,19 @@ export class Pipeline {
     for (const event of events) {
       switch (event.kind) {
         case 'flow_delta': {
+          if (
+            !Number.isFinite(event.bytesIn) ||
+            !Number.isFinite(event.bytesOut) ||
+            event.bytesIn < 0 ||
+            event.bytesOut < 0 ||
+            event.bytesIn > MAX_FLOW_BYTES ||
+            event.bytesOut > MAX_FLOW_BYTES
+          ) {
+            this.log.warn(
+              `Dropping flow_delta with out-of-range bytes (in=${event.bytesIn} out=${event.bytesOut}) flow=${event.flowId}`,
+            );
+            break;
+          }
           const deviceId = this.identity.resolveDeviceId(event.device, event.ts, sourceId);
           this.applyFlow(sourceId, deviceId, event);
           const delta = deviceDeltas.get(deviceId) ?? { bytesIn: 0, bytesOut: 0, ts: event.ts };

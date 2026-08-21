@@ -219,7 +219,21 @@ const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const FAVICON_FRESH_MS = 7 * 24 * 60 * 60 * 1_000;
 const FAVICON_NEGATIVE_MS = 60 * 60 * 1_000;
 const FAVICON_TIMEOUT_MS = 4_000;
+const FAVICON_MISSES_MAX = 1_000;
 const RULES_CACHE_MS = 60_000;
+
+function pruneNegativeCache(cache: Map<string, number>, now: number): void {
+  for (const [key, until] of cache) {
+    if (until <= now) cache.delete(key);
+  }
+  // Negative entries arrive keyed by arbitrary hosts; cap the map so a flood of
+  // unresolvable names cannot grow it without bound between expirations.
+  while (cache.size > FAVICON_MISSES_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
 
 function parseCookies(header: string | undefined): Map<string, string> {
   const cookies = new Map<string, string>();
@@ -412,6 +426,7 @@ export async function createApi(options: ApiOptions): Promise<FastifyInstance> {
         .header('cache-control', 'public,max-age=86400')
         .send(icon);
     } catch {
+      pruneNegativeCache(faviconMisses, now);
       faviconMisses.set(domain, now + FAVICON_NEGATIVE_MS);
       return reply.code(404).send({ message: 'Not found' });
     }

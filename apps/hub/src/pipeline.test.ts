@@ -447,4 +447,55 @@ describe('Pipeline', () => {
     expect(unmarked.country).toBe('US');
     expect(flagless.country).toBeUndefined();
   });
+
+  it('drops flow deltas whose byte counts are not finite safe integers', () => {
+    const device = { mac: '00:11:22:33:44:99', name: 'Spike' };
+    pipeline.ingest('source-1', [
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-huge',
+        device,
+        dst: { host: 'example.com', proto: 'tcp' },
+        bytesIn: Number.MAX_SAFE_INTEGER + 1,
+        bytesOut: 10,
+        state: 'active',
+      },
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-negative',
+        device,
+        dst: { host: 'example.com', proto: 'tcp' },
+        bytesIn: -5,
+        bytesOut: 0,
+        state: 'active',
+      },
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-nan',
+        device,
+        dst: { host: 'example.com', proto: 'tcp' },
+        bytesIn: Number.NaN,
+        bytesOut: 1,
+        state: 'active',
+      },
+      {
+        kind: 'flow_delta',
+        ts: now,
+        flowId: 'flow-ok',
+        device,
+        dst: { host: 'example.com', proto: 'tcp' },
+        bytesIn: 40,
+        bytesOut: 6,
+        state: 'completed',
+      },
+    ]);
+    pipeline.flush();
+
+    const flows = store.listFlows().flows;
+    expect(flows.map((flow) => flow.id)).toEqual(['flow-ok']);
+    expect(flows[0]).toMatchObject({ bytesIn: 40, bytesOut: 6 });
+  });
 });

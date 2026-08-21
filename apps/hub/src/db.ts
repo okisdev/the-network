@@ -11,6 +11,9 @@ export function migrate(db: HubDatabase): void {
 export function openDatabase(dataDir: string): HubDatabase {
   const db = new Database(join(dataDir, 'hub.db'));
   db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('temp_store = MEMORY');
+  db.pragma('cache_size = -65536');
   migrate(db);
   return db;
 }
