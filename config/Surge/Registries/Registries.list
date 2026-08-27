@@ -1,0 +1,50 @@
+# The Network: official package registries
+#
+# Expects DIRECT. Must precede the download classification.
+#
+# The generic download set is the wrong unit for this network. It puts working Fastly registries, GitHub Pages indexes that stall on the direct path, and destinations the GFW blocks into one bucket and sends them all DIRECT. GitHub-hosted downloads already live in GitHub/GitHub.list (Japan). Destinations that die on DIRECT live in Rescue/BlockedDirect.list (Proxy). This file owns the remaining official registries so their policy is a decision, not an inheritance from that bucket.
+#
+# Policy is DIRECT because that is the measured working path. In the 14 days to 2026-08-14, registry.npmjs.org carried 1.34GB over 3180 flows, files.pythonhosted.org carried 76MB, and static.crates.io completed the same way. Do not promote a host from here to Proxy or to a region pin without a reproduced failure on the direct path.
+#
+# Scope: the package body or index host of an official registry, in use here or unambiguous. Website, documentation, and static-asset hosts stay out so they keep the cdn or global classification. GitHub-hosted registries stay in GitHub/GitHub.list. Chinese mirrors stay in the domestic classification. Docker Hub stays in the cdn classification. NuGet stays in the Microsoft classification.
+
+# npm. Exact hosts only: DOMAIN-SUFFIX npmjs.org would steal www.npmjs.com and api.npmjs.org from the global classification.
+DOMAIN,registry.npmjs.org
+DOMAIN,registry.npmjs.com
+DOMAIN,skimdb.npmjs.com
+DOMAIN,replicate.npmjs.com
+
+# Yarn Classic still publishes from this zone. Modern Yarn hits the npm registry above.
+DOMAIN-SUFFIX,yarnpkg.com
+
+# PyPI
+DOMAIN-SUFFIX,pypi.org
+DOMAIN-SUFFIX,pythonhosted.org
+
+# crates.io, including the sparse index and static.crates.io crate files.
+DOMAIN-SUFFIX,crates.io
+
+# Go module proxy. Exact hosts only: DOMAIN-SUFFIX golang.org would steal pkg.go.dev from the global classification.
+DOMAIN,proxy.golang.org
+DOMAIN,sum.golang.org
+DOMAIN,index.golang.org
+
+# RubyGems
+DOMAIN,rubygems.org
+DOMAIN,index.rubygems.org
+
+# Maven Central
+DOMAIN,repo1.maven.org
+DOMAIN,repo.maven.apache.org
+
+# Packagist
+DOMAIN-SUFFIX,packagist.org
+
+# Hex
+DOMAIN,repo.hex.pm
+
+# CocoaPods
+DOMAIN,cdn.cocoapods.org
+
+# Anaconda
+DOMAIN-SUFFIX,repo.anaconda.com
