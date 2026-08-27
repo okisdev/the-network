@@ -1,0 +1,8 @@
+# The Network: Apple China
+#
+# Expects Domestic. Must precede Platforms/AppleServices.list.
+#
+# The mainland-operated estate. These serve from mainland infrastructure and belong on the domestic path; through a proxy exit they still answer, which is how the mismatch hides. Measured as mainland iCloud IMAP riding the proxy while classified under the services list.
+
+DOMAIN-SUFFIX,apple.com.cn
+DOMAIN-SUFFIX,icloud.com.cn
