@@ -1,13 +1,13 @@
 # Library index
 
-80 first-party rule sets. Policy names match the panel groups.
+84 first-party rule sets. Policy names match the panel groups.
 
 ### Reject
 
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
 | [`Reject/Ads.list`](Reject/Ads.list) | Ads | AdBlock | 38 |
-| [`Reject/HttpDNS.list`](Reject/HttpDNS.list) | HTTP DNS | AdBlock | 14 |
+| [`Reject/HttpDNS.list`](Reject/HttpDNS.list) | HTTP DNS | AdBlock | 15 |
 
 ### Direct
 
@@ -17,9 +17,11 @@
 | [`Direct/CDNChina.list`](Direct/CDNChina.list) | China CDN | DIRECT | 23 |
 | [`Direct/AppleCDN.list`](Direct/AppleCDN.list) | Apple CDN | DIRECT | 8 |
 | [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 16 |
-| [`Direct/Registries.list`](Direct/Registries.list) | Package registries | DIRECT | 19 |
 | [`Direct/NTP.list`](Direct/NTP.list) | NTP | DIRECT | 11 |
-| [`Direct/Speedtest.list`](Direct/Speedtest.list) | Speedtest | Proxy | 5 |
+| [`Direct/Speedtest.list`](Direct/Speedtest.list) | Speedtest | Proxy | 8 |
+| [`Direct/Carrier.list`](Direct/Carrier.list) | Carrier services | DIRECT | 1 |
+| [`Direct/Syncthing.list`](Direct/Syncthing.list) | Syncthing | DIRECT | 1 |
+| [`Direct/PrivateRelay.list`](Direct/PrivateRelay.list) | iCloud Private Relay | DIRECT | 5 |
 
 ### Social
 
@@ -104,8 +106,10 @@
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
 | [`Platforms/Google.list`](Platforms/Google.list) | Google | Proxy | 14 |
-| [`Platforms/AppleServices.list`](Platforms/AppleServices.list) | Apple services | Proxy | 20 |
-| [`Platforms/Microsoft.list`](Platforms/Microsoft.list) | Microsoft | Microsoft | 14 |
+| [`Platforms/AppleServices.list`](Platforms/AppleServices.list) | Apple services | Proxy | 18 |
+| [`Platforms/AppleChina.list`](Platforms/AppleChina.list) | Apple China | Domestic | 2 |
+| [`Platforms/iCloud.list`](Platforms/iCloud.list) | iCloud | DIRECT | 2 |
+| [`Platforms/Microsoft.list`](Platforms/Microsoft.list) | Microsoft | Microsoft | 15 |
 | [`Platforms/MicrosoftCDN.list`](Platforms/MicrosoftCDN.list) | Microsoft CDN | DIRECT | 6 |
 | [`Platforms/Meta.list`](Platforms/Meta.list) | Meta | Proxy | 8 |
 | [`Platforms/Amazon.list`](Platforms/Amazon.list) | Amazon | Proxy | 9 |
