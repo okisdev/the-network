@@ -1,0 +1,7 @@
+# The Network: Syncthing
+#
+# Expects DIRECT.
+#
+# Global discovery and relays. Announcing through a proxy registers the exit address as the device's endpoint, which defeats direct peer connections the same way a proxied STUN answer would. The STUN host is already covered by always-real-ip; this file keeps discovery and relay traffic on the real path.
+
+DOMAIN-SUFFIX,syncthing.net
