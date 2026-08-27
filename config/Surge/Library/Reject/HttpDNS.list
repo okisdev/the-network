@@ -6,6 +6,7 @@
 
 DOMAIN-SUFFIX,httpdns.platform.dbankcloud.cn
 DOMAIN-SUFFIX,httpdns.platform.dbankcloud.com
+DOMAIN,dns.wechat.com
 DOMAIN,dns.weixin.qq.com
 DOMAIN,dns.weixin.qq.com.cn
 DOMAIN,httpdns.alicdn.com

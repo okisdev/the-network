@@ -60,9 +60,11 @@ DOMAIN,api.jetbrains.ai
 # Raycast. The suffix covers the whole product deliberately: its AI and dictation
 # endpoints need a foreign exit, and so does the rest of it.
 DOMAIN-SUFFIX,raycast.com
+DOMAIN-SUFFIX,raycast-releases.com
 
 # Aggregators, inference hosts, and model registries
 DOMAIN,openrouter.ai
+DOMAIN,models.dev
 DOMAIN,gateway.ai.cloudflare.com
 DOMAIN-SUFFIX,perplexity.ai
 DOMAIN-SUFFIX,ollama.com

@@ -1,0 +1,8 @@
+# The Network: iCloud
+#
+# Expects DIRECT. Must follow Apple/iCloudContent.list, Direct/PrivateRelay.list, and Platforms/AppleServices.list so content, relay, and pinned auth hosts keep their own policies; this file owns the remaining service plane.
+#
+# The sync and data plane: gateway, CloudKit, contacts, calendars, mail, Find My. Unclassified it falls through to the proxy catch-all, where the QUIC policy blocks its HTTP/3 on every connection; measured at 9139 gateway flows and over 3500 blocked QUIC attempts in 14 days. DIRECT keeps HTTP/3 native and the sync path on the access network.
+
+DOMAIN-SUFFIX,icloud.com
+DOMAIN-SUFFIX,apple-cloudkit.com

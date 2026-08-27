@@ -8,4 +8,7 @@ DOMAIN-SUFFIX,ookla.com
 DOMAIN-SUFFIX,speed.cloudflare.com
 DOMAIN-SUFFIX,speedtest.cn
 DOMAIN-SUFFIX,speedtest.net
+DOMAIN-SUFFIX,stvidtest.net
+DOMAIN,csl.hkspeedtest.com
+DOMAIN,hkspeedtest.netvigator.com
 DOMAIN,speedtest.tele2.net

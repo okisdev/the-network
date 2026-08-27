@@ -2,10 +2,8 @@
 #
 # Expects Proxy.
 #
-# Store, account, and update-check hosts. Do not assign DIRECT to this file. Overlay Apple lists and Direct/AppleCDN.list must precede it. Media playback stays in Media/AppleMedia.list.
+# Store, account, and update-check hosts. Do not assign DIRECT to this file. Overlay Apple lists, Direct/AppleCDN.list, and Platforms/AppleChina.list must precede it; the iCloud service plane lives in Platforms/iCloud.list behind it. Media playback stays in Media/AppleMedia.list.
 
-DOMAIN-SUFFIX,apple.com.cn
-DOMAIN-SUFFIX,icloud.com.cn
 DOMAIN,albert.apple.com
 DOMAIN,appleid.apple.com
 DOMAIN,apps.apple.com
