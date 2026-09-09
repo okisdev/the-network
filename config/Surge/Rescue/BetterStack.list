@@ -1,0 +1,7 @@
+# The Network: Better Stack false positives
+#
+# Expects Proxy. Must precede the imported reject layer.
+#
+# Log shipping to Better Stack ingests at s<source>.<cluster>.betterstackdata.com, and the reject set classifies the whole zone as telemetry. Measured as 9,702 rejected flows in the 14 days to 2026-09-09, almost all from the Mac that runs the shippers; the symptom is a source that stops receiving lines while the client reports nothing.
+
+DOMAIN-SUFFIX,betterstackdata.com
