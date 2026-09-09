@@ -1,0 +1,9 @@
+# The Network: miHoYo
+#
+# Expects Domestic.
+#
+# The mainland servers. The global publisher lives in Gaming/HoYoverse.list.
+
+DOMAIN-SUFFIX,bh3.com
+DOMAIN-SUFFIX,mihoyo.com
+DOMAIN-SUFFIX,yuanshen.com

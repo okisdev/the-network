@@ -1,0 +1,36 @@
+# The Network: Certificate validation
+#
+# Expects DIRECT.
+#
+# OCSP responders and CRL and AIA hosts of the public CAs. A revocation check sits on the critical path of the TLS handshake that triggers it, and every one of these routed through the proxy in the 14 days to 2026-09-09 (ocsp.digicert.com 264 flows) while DigiCert's mainland responder ran direct with none failed (ocsp.digicert.cn 443 flows). The CAs serve these from anycast networks with mainland reach; Google's pki.goog does not and stays out. Apple's own responders live in Platforms/Apple.list and Microsoft's in Platforms/MicrosoftCDN.list.
+
+DOMAIN-SUFFIX,amazontrust.com
+DOMAIN-SUFFIX,lencr.org
+DOMAIN,aia.entrust.net
+DOMAIN,cacerts.digicert.cn
+DOMAIN,cacerts.digicert.com
+DOMAIN,certificates.godaddy.com
+DOMAIN,crl.comodoca.com
+DOMAIN,crl.entrust.net
+DOMAIN,crl.globalsign.com
+DOMAIN,crl.godaddy.com
+DOMAIN,crl.sectigo.com
+DOMAIN,crl.usertrust.com
+DOMAIN,crl3.digicert.com
+DOMAIN,crl4.digicert.com
+DOMAIN,crt.sectigo.com
+DOMAIN,ocsp.comodoca.com
+DOMAIN,ocsp.digicert.cn
+DOMAIN,ocsp.digicert.com
+DOMAIN,ocsp.entrust.net
+DOMAIN,ocsp.globalsign.com
+DOMAIN,ocsp2.globalsign.com
+DOMAIN,ocsp.godaddy.com
+DOMAIN,ocsp.identrust.com
+DOMAIN,ocsp.sectigo.com
+DOMAIN,ocsp.usertrust.com
+DOMAIN,secure.globalsign.com
+DOMAIN,status.geotrust.com
+DOMAIN,status.rapidssl.com
+DOMAIN,status.thawte.com
+DOMAIN,validation.identrust.com

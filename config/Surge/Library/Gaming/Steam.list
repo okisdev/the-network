@@ -1,8 +1,14 @@
 # The Network: Steam
 #
 # Expects a gaming policy.
+#
+# Store, community, chat and the API. Game content stays on the direct path through Direct/Download.list (steamcontent.com and the Akamai delivery hosts), which must precede this file.
 
+DOMAIN-SUFFIX,s.team
+DOMAIN-SUFFIX,steam-chat.com
 DOMAIN-SUFFIX,steamcommunity.com
+DOMAIN-SUFFIX,steamdeck.com
+DOMAIN-SUFFIX,steamgames.com
 DOMAIN-SUFFIX,steampowered.com
 DOMAIN-SUFFIX,steamserver.net
 DOMAIN-SUFFIX,steamstatic.com

@@ -1,0 +1,11 @@
+# The Network: Google China
+#
+# Expects Domestic. Must precede Platforms/Google.list.
+#
+# The endpoints Google serves for the mainland: the reCAPTCHA mirror, the .cn API and static mirrors, and the -cn download redirector. recaptcha.net exists so that sites work without a foreign exit; through the proxy it lost 14 of 36 flows to blocked QUIC in the 14 days to 2026-09-09.
+
+DOMAIN-SUFFIX,google.cn
+DOMAIN-SUFFIX,googleapis.cn
+DOMAIN-SUFFIX,gstatic.cn
+DOMAIN-SUFFIX,gvt1-cn.com
+DOMAIN-SUFFIX,recaptcha.net

@@ -1,8 +1,11 @@
 # The Network: Huawei
 #
 # Expects Domestic.
+#
+# Reject/HttpDNS.list precedes this file for the HTTP DNS hosts under dbankcloud.
 
 DOMAIN-SUFFIX,dbankcdn.com
+DOMAIN-SUFFIX,dbankcloud.com
 DOMAIN-SUFFIX,hicloud.com
 DOMAIN-SUFFIX,huawei.com
 DOMAIN-SUFFIX,huaweicloud.com

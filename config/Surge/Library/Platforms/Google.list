@@ -1,20 +1,41 @@
 # The Network: Google
 #
-# Expects Proxy.
+# Expects Proxy, referenced with extended-matching.
 #
-# The overlay AI list must precede this file so Gemini and Studio stay on AI Suite.
+# The overlay AI list must precede this file so Gemini, AI Studio and the .google AI products stay on AI Suite. YouTube has its own file. The mainland endpoints live in Platforms/GoogleChina.list and must precede this file.
 
+DOMAIN-SUFFIX,1e100.net
+DOMAIN-SUFFIX,ampproject.org
+DOMAIN-SUFFIX,android.com
+DOMAIN-SUFFIX,appspot.com
+DOMAIN-SUFFIX,blogger.com
+DOMAIN-SUFFIX,blogspot.com
+DOMAIN-SUFFIX,chrome.com
+DOMAIN-SUFFIX,chromium.org
+DOMAIN-SUFFIX,crashlytics.com
+DOMAIN-SUFFIX,firebase.com
+DOMAIN-SUFFIX,firebaseio.com
+DOMAIN-SUFFIX,g.co
 DOMAIN-SUFFIX,ggpht.com
 DOMAIN-SUFFIX,gmail.com
+DOMAIN-SUFFIX,goo.gl
+DOMAIN-SUFFIX,goog
+DOMAIN-SUFFIX,google
 DOMAIN-SUFFIX,google.co.jp
 DOMAIN-SUFFIX,google.com
 DOMAIN-SUFFIX,google.com.hk
+DOMAIN-SUFFIX,google.com.sg
 DOMAIN-SUFFIX,google.com.tw
+DOMAIN-SUFFIX,google.dev
 DOMAIN-SUFFIX,googleapis.com
+DOMAIN-SUFFIX,googledomains.com
 DOMAIN-SUFFIX,googlemail.com
+DOMAIN-SUFFIX,googlesource.com
+DOMAIN-SUFFIX,googletagmanager.com
 DOMAIN-SUFFIX,googleusercontent.com
 DOMAIN-SUFFIX,googlezip.net
 DOMAIN-SUFFIX,gstatic.com
 DOMAIN-SUFFIX,gvt1.com
 DOMAIN-SUFFIX,gvt2.com
+DOMAIN-SUFFIX,gvt3.com
 DOMAIN-SUFFIX,withgoogle.com

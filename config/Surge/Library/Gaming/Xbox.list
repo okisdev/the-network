@@ -1,7 +1,14 @@
 # The Network: Xbox
 #
-# Expects a gaming policy.
+# Expects a gaming policy. Must precede Platforms/Microsoft.list, which would otherwise take the account hosts.
+#
+# Xbox, Game Pass and Minecraft. xbox.*.microsoft.com and xboxlive.com sit in the profile's always-real-ip, so a console's NAT probes reach the gateway by address and never match here.
 
 DOMAIN-SUFFIX,gamepass.com
+DOMAIN-SUFFIX,minecraft.net
+DOMAIN-SUFFIX,minecraftservices.com
+DOMAIN-SUFFIX,mojang.com
 DOMAIN-SUFFIX,xbox.com
+DOMAIN-SUFFIX,xboxgamepass.com
 DOMAIN-SUFFIX,xboxlive.com
+DOMAIN-SUFFIX,xboxservices.com

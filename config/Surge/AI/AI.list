@@ -6,9 +6,9 @@
 #
 # This file owns the AI category outright rather than layering on top of a generic one. Generic AI classification gets two things wrong for this network: it treats the plain GitHub API as a model endpoint, and it misses several services in daily use here.
 #
-# Scope: a service earns a line when it is in use here or when it is unambiguously an AI endpoint with no chance of collateral. An omission costs the ability to steer AI separately, never connectivity, because everything else still lands on a proxy one way or another. Verified 2026-08-12: the Gemini backend hosts left out are caught by a google keyword rule in the general proxy classification, and the remainder, meta.ai and poe.com and the assorted image generators, reach the FINAL catch-all, which is also a proxy.
+# Scope: a service earns a line when it is in use here or when it is an unambiguous AI product endpoint, meaning inference, chat, generation, or the agent tooling built on them. Benchmark sites, observability dashboards and vendor marketing stay out. An omission costs the ability to steer AI separately and to account for it as a category in the console, never connectivity, because everything else still lands on a proxy one way or another.
 #
-# Chinese providers are deliberately absent. Verified 2026-08-12 that the domestic classification already carries deepseek.com, kimi.com, doubao.com, tongyi.com, and z.ai, and that the .cn catch-all behind it carries moonshot.cn, bigmodel.cn, and siliconflow.cn. Adding them here would only create a second place to be wrong.
+# Chinese providers live in AI/AIChina.list on the domestic path.
 
 # Anthropic
 DOMAIN-SUFFIX,anthropic.com
@@ -55,12 +55,41 @@ DOMAIN-SUFFIX,claudemcpclient.com
 DOMAIN-SUFFIX,claudemcpcontent.com
 DOMAIN-SUFFIX,windsurf.com
 DOMAIN-SUFFIX,windsurf.build
+DOMAIN-SUFFIX,codeium.com
+DOMAIN-SUFFIX,zed.dev
+DOMAIN-SUFFIX,sourcegraph.com
+DOMAIN-SUFFIX,continue.dev
+DOMAIN-SUFFIX,tabnine.com
+DOMAIN-SUFFIX,supermaven.com
+DOMAIN-SUFFIX,augmentcode.com
+DOMAIN-SUFFIX,opencode.ai
+DOMAIN-SUFFIX,litellm.ai
+DOMAIN-SUFFIX,cognition.com
+DOMAIN-SUFFIX,cognition.ai
+DOMAIN-SUFFIX,devin.ai
+DOMAIN-SUFFIX,manus.im
+DOMAIN-SUFFIX,genspark.ai
+DOMAIN-SUFFIX,lovable.dev
+DOMAIN-SUFFIX,lovable.app
+DOMAIN-SUFFIX,bolt.new
+DOMAIN-SUFFIX,v0.dev
+DOMAIN-SUFFIX,v0.app
 DOMAIN,api.jetbrains.ai
 
 # Raycast. The suffix covers the whole product deliberately: its AI and dictation
 # endpoints need a foreign exit, and so does the rest of it.
 DOMAIN-SUFFIX,raycast.com
 DOMAIN-SUFFIX,raycast-releases.com
+
+# Chat products. kimi.ai is Moonshot's overseas product; the mainland kimi.com lives in AI/AIChina.list.
+DOMAIN-SUFFIX,meta.ai
+DOMAIN-SUFFIX,poe.com
+DOMAIN-SUFFIX,character.ai
+DOMAIN-SUFFIX,kimi.ai
+DOMAIN-SUFFIX,lobehub.com
+DOMAIN-SUFFIX,lmarena.ai
+DOMAIN-SUFFIX,arena.ai
+DOMAIN,copilot.microsoft.com
 
 # Aggregators, inference hosts, and model registries
 DOMAIN,openrouter.ai
@@ -70,5 +99,25 @@ DOMAIN-SUFFIX,perplexity.ai
 DOMAIN-SUFFIX,ollama.com
 DOMAIN-SUFFIX,groq.com
 DOMAIN-SUFFIX,mistral.ai
+DOMAIN-SUFFIX,cohere.com
+DOMAIN-SUFFIX,cohere.ai
+DOMAIN-SUFFIX,together.ai
+DOMAIN-SUFFIX,together.xyz
+DOMAIN-SUFFIX,fireworks.ai
+DOMAIN-SUFFIX,cerebras.ai
+DOMAIN-SUFFIX,deepinfra.com
+DOMAIN-SUFFIX,replicate.com
+DOMAIN-SUFFIX,replicate.delivery
+DOMAIN-SUFFIX,fal.ai
+DOMAIN-SUFFIX,fal.run
 DOMAIN-SUFFIX,huggingface.co
 DOMAIN-SUFFIX,hf.co
+
+# Image, video, voice and music generation
+DOMAIN-SUFFIX,midjourney.com
+DOMAIN-SUFFIX,stability.ai
+DOMAIN-SUFFIX,runwayml.com
+DOMAIN-SUFFIX,lumalabs.ai
+DOMAIN-SUFFIX,suno.com
+DOMAIN-SUFFIX,suno.ai
+DOMAIN-SUFFIX,elevenlabs.io

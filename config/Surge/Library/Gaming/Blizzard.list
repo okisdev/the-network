@@ -1,7 +1,8 @@
 # The Network: Blizzard
 #
 # Expects a gaming policy.
+#
+# battlenet.com.cn, the NetEase-operated mainland service, falls to the .cn rule.
 
 DOMAIN-SUFFIX,battle.net
-DOMAIN-SUFFIX,battlenet.com.cn
 DOMAIN-SUFFIX,blizzard.com

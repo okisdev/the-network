@@ -1,21 +1,52 @@
 # The Network: Microsoft
 #
-# Expects Microsoft.
+# Expects Microsoft, referenced with extended-matching.
 #
-# Large-file CDNs live in Platforms/MicrosoftCDN.list and must precede this file. microsoft.com would otherwise swallow them.
+# Accounts, Office, Azure, Bing, Skype and the VS Code service plane. Update and download hosts live in Platforms/MicrosoftCDN.list and must precede this file, whose suffixes would otherwise take them. Xbox has its own file. msftconnecttest.com and msftncsi.com sit in the profile's always-real-ip, so their probes reach the gateway by address and never match here.
 
 DOMAIN-SUFFIX,1drv.com
 DOMAIN-SUFFIX,azure.com
+DOMAIN-SUFFIX,azure.net
+DOMAIN-SUFFIX,azureedge.net
+DOMAIN-SUFFIX,azurefd.net
+DOMAIN-SUFFIX,azurewebsites.net
+DOMAIN-SUFFIX,bing.com
+DOMAIN-SUFFIX,bing.net
+DOMAIN-SUFFIX,cloudapp.net
+DOMAIN-SUFFIX,exp-tas.com
 DOMAIN-SUFFIX,hotmail.com
 DOMAIN-SUFFIX,live.com
 DOMAIN-SUFFIX,live.net
+DOMAIN-SUFFIX,livefilestore.com
+DOMAIN-SUFFIX,microsoft
 DOMAIN-SUFFIX,microsoft.com
 DOMAIN-SUFFIX,microsoftonline.com
+DOMAIN-SUFFIX,microsoftonline-p.com
+DOMAIN-SUFFIX,microsoftpersonalcontent.com
+DOMAIN-SUFFIX,msauth.net
+DOMAIN-SUFFIX,msauthimages.net
+DOMAIN-SUFFIX,msecnd.net
+DOMAIN-SUFFIX,msedge.net
+DOMAIN-SUFFIX,msftauth.net
+DOMAIN-SUFFIX,msftauthimages.net
 DOMAIN-SUFFIX,msftconnecttest.com
+DOMAIN-SUFFIX,msftncsi.com
 DOMAIN-SUFFIX,msn.com
 DOMAIN-SUFFIX,office.com
+DOMAIN-SUFFIX,office.net
 DOMAIN-SUFFIX,office365.com
 DOMAIN-SUFFIX,onedrive.com
+DOMAIN-SUFFIX,onenote.com
+DOMAIN-SUFFIX,onenote.net
 DOMAIN-SUFFIX,outlook.com
+DOMAIN-SUFFIX,s-microsoft.com
 DOMAIN-SUFFIX,sharepoint.com
+DOMAIN-SUFFIX,sharepointonline.com
+DOMAIN-SUFFIX,skype.com
+DOMAIN-SUFFIX,visualstudio.com
+DOMAIN-SUFFIX,vsassets.io
+DOMAIN-SUFFIX,vscode-cdn.net
+DOMAIN-SUFFIX,vscode-unpkg.net
+DOMAIN-SUFFIX,windows.com
 DOMAIN-SUFFIX,windows.net
+DOMAIN,vscode-sync.trafficmanager.net
