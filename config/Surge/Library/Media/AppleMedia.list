@@ -1,15 +1,19 @@
-# The Network: Apple media
+# The Network: Apple TV and News
 #
-# Expects Proxy.
+# Expects Proxy, referenced with extended-matching. Must precede Platforms/Apple.list.
 #
-# Music, TV, and podcasts. Push and iCloud content stay in the overlay. Store and update-check hosts live in Platforms/AppleServices.list.
+# The two Apple services whose catalog depends on where the connection comes from: the TV app with its channels and licensed streams, and News. Music and Podcasts are storefront bound rather than address bound, so they stay on the direct floor; through the proxy their playback hosts lost a third of their flows to blocked QUIC in the 14 days to 2026-09-09.
 
-DOMAIN-SUFFIX,applemusic.com
-DOMAIN-SUFFIX,podcasts.apple.com
-DOMAIN,amp-api.music.apple.com
-DOMAIN,aod.itunes.apple.com
-DOMAIN,audio-ssl.itunes.apple.com
-DOMAIN,play-edge.itunes.apple.com
-DOMAIN,play.itunes.apple.com
-DOMAIN,streamingaudio.itunes.apple.com
-DOMAIN,tv.apple.com
+DOMAIN-SUFFIX,tv.apple.com
+DOMAIN-SUFFIX,apple.news
+DOMAIN,hls.itunes.apple.com
+DOMAIN,hls-amt.itunes.apple.com
+DOMAIN,hls-svod.itunes.apple.com
+DOMAIN,np-edge.itunes.apple.com
+DOMAIN,ocvideo.apple.com
+DOMAIN,uts-api.itunes.apple.com
+DOMAIN,news-assets.apple.com
+DOMAIN,news-client.apple.com
+DOMAIN,news-client-search.apple.com
+DOMAIN,news-edge.apple.com
+DOMAIN,news-events.apple.com

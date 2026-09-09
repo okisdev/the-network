@@ -1,0 +1,28 @@
+# The Network: Apple
+#
+# Expects DIRECT, referenced with extended-matching. The company-wide floor: every Apple name and Apple's own address space. Must follow Apple/AppleIntelligence.list, Media/AppleMedia.list, Platforms/AppleChina.list and Direct/PrivateRelay.list, the four Apple sets whose policy differs; everything else Apple lands here instead of in FINAL.
+#
+# Direct is the measured path. Apple fronts this network from a point of presence a few milliseconds away (gateway.icloud.com connects in 12ms), and in the 14 days to 2026-09-09 the direct iCloud plane carried 72,000 flows with 6 failures. The proxy path bought nothing and cost two things. The global block-quic setting turned every HTTP/3 attempt into a timeout before the TCP fallback: setup.icloud.com, the session bootstrap for every iCloud service including Backup, lost 146 of 480 flows that way. And Apple's frontends refuse some exit nodes outright: init.itunes.apple.com, the App Store bootstrap, failed 132 of 135 flows through one Japan node. Sixty-two apple.com hosts had no classification at all and rode FINAL, among them the iMessage identity servers under ess.apple.com, Game Center, gsas.apple.com, unlinkability.apple.com, tether.edge.apple (37 of 37 failed), the partitioned p*-buy.itunes.apple.com store hosts, and iCloud Mail on me.com.
+#
+# The address rules carry what arrives without a name. iCloud content uploads and downloads run over HTTP/3 to edge-*.hkhkg2.icloud-content.com with no SNI the gateway can read, so they reach the gateway as a bare address; unmatched they fell to FINAL, where block-quic rejected them 54,300 times in the same 14 days, from every Apple device in the house and through the overnight backup window, while the same edges over TCP completed 4,700 transfers with one failure. 17.0.0.0/8 and the three IPv6 blocks are Apple's own allocations, so one rule covers those edges (17.248.152.0/24 and 17.248.163.0/24 here, shared with the Private Relay ingress and the Intelligence relay), the gateway range (17.248.216.0/24), and the time servers. The rules sit in this file, after the named exceptions, on purpose: no-resolve keeps them away from requests that arrived as a name, but a request that arrived as an address with an SNI is matched by address, so an earlier address rule would take Private Relay or Intelligence traffic from the files that own it.
+#
+# The services that keep a foreign exit on purpose stay out: Apple Intelligence in the overlay, TV and News in Media/AppleMedia.list.
+
+DOMAIN-SUFFIX,apple
+DOMAIN-SUFFIX,apple.com
+DOMAIN-SUFFIX,apple-cloudkit.com
+DOMAIN-SUFFIX,apple-dns.net
+DOMAIN-SUFFIX,apple-livephotoskit.com
+DOMAIN-SUFFIX,apple-mapkit.com
+DOMAIN-SUFFIX,apzones.com
+DOMAIN-SUFFIX,aaplimg.com
+DOMAIN-SUFFIX,cdn-apple.com
+DOMAIN-SUFFIX,icloud.com
+DOMAIN-SUFFIX,icloud-content.com
+DOMAIN-SUFFIX,me.com
+DOMAIN-SUFFIX,mzstatic.com
+
+IP-CIDR,17.0.0.0/8,no-resolve
+IP-CIDR6,2403:300::/32,no-resolve
+IP-CIDR6,2620:149::/32,no-resolve
+IP-CIDR6,2a01:b740::/32,no-resolve

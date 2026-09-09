@@ -1,10 +1,12 @@
 # The Network: Apple Intelligence
 #
-# Expects the AI Suite policy. Must precede the broader Apple classification, which would otherwise route these as ordinary Apple services.
+# Expects the AI Suite policy, referenced with extended-matching. Must precede Platforms/Apple.list, which would otherwise route these direct like ordinary Apple services, by name and by address.
 #
 # Private Cloud Compute reaches Apple's inference through these relay hosts, which are fronted by Cloudflare and Fastly rather than by Apple. The feature is region gated, so it needs the same foreign exit as every other AI service, which is why it is grouped with AI rather than with push and content.
 #
-# Do not confuse apple-relay with the iCloud Private Relay ingress at mask.icloud.com, which is a different service that this repository does not route. The two share address space, apple-relay.apple.com and mask.icloud.com both resolving into 17.248.152.0/24 and 17.248.163.0/24, so they can only be told apart by domain and never by address.
+# gspe1-ssl.ls.apple.com answers the GeoServices country lookup that the eligibility check reads, so it takes the same exit as the relays.
+#
+# apple-relay.apple.com shares 17.248.152.0/24 and 17.248.163.0/24 with the Private Relay ingress at mask.icloud.com and with the iCloud content edges, so the three can only be told apart by name; Platforms/Apple.list carries the address space for the flows that arrive without one, and sits behind this file so an address never outranks the name.
 
 DOMAIN,apple-relay.apple.com
 DOMAIN,apple-relay.cloudflare.com
