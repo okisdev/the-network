@@ -1,6 +1,6 @@
 # Library index
 
-84 first-party rule sets. Policy names match the panel groups.
+89 first-party rule sets. Policy names match the panel groups.
 
 ### Reject
 
@@ -13,119 +13,124 @@
 
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
-| [`Direct/Private.list`](Direct/Private.list) | Private names | DIRECT | 7 |
 | [`Direct/CDNChina.list`](Direct/CDNChina.list) | China CDN | DIRECT | 23 |
-| [`Direct/AppleCDN.list`](Direct/AppleCDN.list) | Apple CDN | DIRECT | 8 |
-| [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 16 |
-| [`Direct/NTP.list`](Direct/NTP.list) | NTP | DIRECT | 11 |
-| [`Direct/Speedtest.list`](Direct/Speedtest.list) | Speedtest | Proxy | 8 |
 | [`Direct/Carrier.list`](Direct/Carrier.list) | Carrier services | DIRECT | 1 |
-| [`Direct/Syncthing.list`](Direct/Syncthing.list) | Syncthing | DIRECT | 1 |
+| [`Direct/Certificates.list`](Direct/Certificates.list) | Certificate validation | DIRECT | 30 |
+| [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 27 |
+| [`Direct/NTP.list`](Direct/NTP.list) | NTP | DIRECT | 11 |
+| [`Direct/Private.list`](Direct/Private.list) | Private names | DIRECT | 7 |
 | [`Direct/PrivateRelay.list`](Direct/PrivateRelay.list) | iCloud Private Relay | DIRECT | 5 |
-
-### Social
-
-| File | Title | Expected policy | Rules |
-| --- | --- | --- | ---: |
-| [`Social/X.list`](Social/X.list) | X | Proxy | 7 |
-| [`Social/Facebook.list`](Social/Facebook.list) | Facebook | Proxy | 8 |
-| [`Social/Instagram.list`](Social/Instagram.list) | Instagram | Proxy | 3 |
-| [`Social/Discord.list`](Social/Discord.list) | Discord | Proxy | 6 |
-| [`Social/Telegram.list`](Social/Telegram.list) | Telegram | Telegram | 9 |
-| [`Social/WhatsApp.list`](Social/WhatsApp.list) | WhatsApp | Proxy | 3 |
-| [`Social/Line.list`](Social/Line.list) | LINE | Proxy | 4 |
-| [`Social/Reddit.list`](Social/Reddit.list) | Reddit | Proxy | 4 |
-| [`Social/LinkedIn.list`](Social/LinkedIn.list) | LinkedIn | Proxy | 3 |
-| [`Social/Snap.list`](Social/Snap.list) | Snap | Proxy | 3 |
-| [`Social/Bluesky.list`](Social/Bluesky.list) | Bluesky | Proxy | 3 |
-| [`Social/WeChat.list`](Social/WeChat.list) | WeChat | Domestic | 7 |
-| [`Social/Weibo.list`](Social/Weibo.list) | Weibo | Domestic | 5 |
-
-### Media
-
-| File | Title | Expected policy | Rules |
-| --- | --- | --- | ---: |
-| [`Media/Netflix.list`](Media/Netflix.list) | Netflix | Netflix | 8 |
-| [`Media/YouTube.list`](Media/YouTube.list) | YouTube | a streaming policy | 10 |
-| [`Media/Disney.list`](Media/Disney.list) | Disney | a streaming policy | 5 |
-| [`Media/Spotify.list`](Media/Spotify.list) | Spotify | a streaming policy | 5 |
-| [`Media/TikTok.list`](Media/TikTok.list) | TikTok | a streaming policy | 8 |
-| [`Media/HBO.list`](Media/HBO.list) | HBO | a streaming policy | 6 |
-| [`Media/Hulu.list`](Media/Hulu.list) | Hulu | a streaming policy | 3 |
-| [`Media/Twitch.list`](Media/Twitch.list) | Twitch | a streaming policy | 4 |
-| [`Media/PrimeVideo.list`](Media/PrimeVideo.list) | Prime Video | a streaming policy | 5 |
-| [`Media/AppleMedia.list`](Media/AppleMedia.list) | Apple media | Proxy | 9 |
-| [`Media/Bilibili.list`](Media/Bilibili.list) | Bilibili | Domestic | 7 |
-| [`Media/iQiyi.list`](Media/iQiyi.list) | iQiyi | Domestic | 4 |
-| [`Media/Youku.list`](Media/Youku.list) | Youku | Domestic | 3 |
-| [`Media/Bahamut.list`](Media/Bahamut.list) | Bahamut | a streaming policy | 2 |
-| [`Media/Viu.list`](Media/Viu.list) | Viu | a streaming policy | 2 |
-| [`Media/China.list`](Media/China.list) | China media | Domestic | 27 |
-
-### Developer
-
-| File | Title | Expected policy | Rules |
-| --- | --- | --- | ---: |
-| [`Developer/GitLab.list`](Developer/GitLab.list) | GitLab | Proxy | 3 |
-| [`Developer/Docker.list`](Developer/Docker.list) | Docker | Proxy | 3 |
-| [`Developer/Npm.list`](Developer/Npm.list) | npm | Proxy | 3 |
-| [`Developer/Vercel.list`](Developer/Vercel.list) | Vercel | Proxy | 4 |
-| [`Developer/Cloudflare.list`](Developer/Cloudflare.list) | Cloudflare | Proxy | 7 |
-| [`Developer/Notion.list`](Developer/Notion.list) | Notion | Proxy | 4 |
-| [`Developer/Figma.list`](Developer/Figma.list) | Figma | Proxy | 2 |
-| [`Developer/Slack.list`](Developer/Slack.list) | Slack | Proxy | 4 |
-| [`Developer/Atlassian.list`](Developer/Atlassian.list) | Atlassian | Proxy | 6 |
-| [`Developer/JetBrains.list`](Developer/JetBrains.list) | JetBrains | Proxy | 4 |
-
-### Gaming
-
-| File | Title | Expected policy | Rules |
-| --- | --- | --- | ---: |
-| [`Gaming/Steam.list`](Gaming/Steam.list) | Steam | a gaming policy | 6 |
-| [`Gaming/Epic.list`](Gaming/Epic.list) | Epic Games | a gaming policy | 4 |
-| [`Gaming/PlayStation.list`](Gaming/PlayStation.list) | PlayStation | a gaming policy | 4 |
-| [`Gaming/Xbox.list`](Gaming/Xbox.list) | Xbox | a gaming policy | 3 |
-| [`Gaming/Nintendo.list`](Gaming/Nintendo.list) | Nintendo | a gaming policy | 4 |
-| [`Gaming/Riot.list`](Gaming/Riot.list) | Riot | a gaming policy | 5 |
-| [`Gaming/Blizzard.list`](Gaming/Blizzard.list) | Blizzard | a gaming policy | 3 |
-| [`Gaming/EA.list`](Gaming/EA.list) | EA | a gaming policy | 3 |
-| [`Gaming/Ubisoft.list`](Gaming/Ubisoft.list) | Ubisoft | a gaming policy | 3 |
-| [`Gaming/HoYoverse.list`](Gaming/HoYoverse.list) | HoYoverse | a gaming policy | 4 |
-
-### Finance
-
-| File | Title | Expected policy | Rules |
-| --- | --- | --- | ---: |
-| [`Finance/PayPal.list`](Finance/PayPal.list) | PayPal | Proxy | 4 |
-| [`Finance/Stripe.list`](Finance/Stripe.list) | Stripe | Proxy | 4 |
-| [`Finance/Binance.list`](Finance/Binance.list) | Binance | Proxy | 5 |
-| [`Finance/Crypto.list`](Finance/Crypto.list) | Cryptocurrency | Proxy | 11 |
-
-### Platforms
-
-| File | Title | Expected policy | Rules |
-| --- | --- | --- | ---: |
-| [`Platforms/Google.list`](Platforms/Google.list) | Google | Proxy | 14 |
-| [`Platforms/AppleServices.list`](Platforms/AppleServices.list) | Apple services | Proxy | 18 |
-| [`Platforms/AppleChina.list`](Platforms/AppleChina.list) | Apple China | Domestic | 2 |
-| [`Platforms/iCloud.list`](Platforms/iCloud.list) | iCloud | DIRECT | 2 |
-| [`Platforms/Microsoft.list`](Platforms/Microsoft.list) | Microsoft | Microsoft | 15 |
-| [`Platforms/MicrosoftCDN.list`](Platforms/MicrosoftCDN.list) | Microsoft CDN | DIRECT | 6 |
-| [`Platforms/Meta.list`](Platforms/Meta.list) | Meta | Proxy | 8 |
-| [`Platforms/Amazon.list`](Platforms/Amazon.list) | Amazon | Proxy | 9 |
-| [`Platforms/ByteDance.list`](Platforms/ByteDance.list) | ByteDance | Domestic | 13 |
-| [`Platforms/Tencent.list`](Platforms/Tencent.list) | Tencent | Domestic | 9 |
-| [`Platforms/Alibaba.list`](Platforms/Alibaba.list) | Alibaba | Domestic | 12 |
-| [`Platforms/Baidu.list`](Platforms/Baidu.list) | Baidu | Domestic | 5 |
-| [`Platforms/Xiaomi.list`](Platforms/Xiaomi.list) | Xiaomi | Domestic | 5 |
-| [`Platforms/Huawei.list`](Platforms/Huawei.list) | Huawei | Domestic | 5 |
-| [`Platforms/NetEase.list`](Platforms/NetEase.list) | NetEase | Domestic | 5 |
+| [`Direct/Syncthing.list`](Direct/Syncthing.list) | Syncthing | DIRECT | 2 |
 
 ### Proxy
 
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
 | [`Proxy/DoH.list`](Proxy/DoH.list) | DNS over HTTPS | Proxy | 8 |
+| [`Proxy/Speedtest.list`](Proxy/Speedtest.list) | Speedtest | Proxy | 8 |
+
+### Social
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Social/Bluesky.list`](Social/Bluesky.list) | Bluesky | Proxy | 3 |
+| [`Social/Discord.list`](Social/Discord.list) | Discord | Proxy | 6 |
+| [`Social/Facebook.list`](Social/Facebook.list) | Facebook | Proxy | 8 |
+| [`Social/Instagram.list`](Social/Instagram.list) | Instagram | Proxy | 3 |
+| [`Social/Line.list`](Social/Line.list) | LINE | Proxy | 4 |
+| [`Social/LinkedIn.list`](Social/LinkedIn.list) | LinkedIn | Proxy | 3 |
+| [`Social/Reddit.list`](Social/Reddit.list) | Reddit | Proxy | 4 |
+| [`Social/Snap.list`](Social/Snap.list) | Snap | Proxy | 3 |
+| [`Social/Telegram.list`](Social/Telegram.list) | Telegram | Telegram | 9 |
+| [`Social/WeChat.list`](Social/WeChat.list) | WeChat | Domestic | 7 |
+| [`Social/Weibo.list`](Social/Weibo.list) | Weibo | Domestic | 5 |
+| [`Social/WhatsApp.list`](Social/WhatsApp.list) | WhatsApp | Proxy | 3 |
+| [`Social/X.list`](Social/X.list) | X | Proxy | 7 |
+| [`Social/Xiaohongshu.list`](Social/Xiaohongshu.list) | Xiaohongshu | Domestic | 3 |
+
+### Media
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Media/AppleMedia.list`](Media/AppleMedia.list) | Apple TV and News | Proxy | 13 |
+| [`Media/Bahamut.list`](Media/Bahamut.list) | Bahamut | a streaming policy | 2 |
+| [`Media/Bilibili.list`](Media/Bilibili.list) | Bilibili | Domestic | 7 |
+| [`Media/China.list`](Media/China.list) | China media | Domestic | 20 |
+| [`Media/Disney.list`](Media/Disney.list) | Disney | a streaming policy | 5 |
+| [`Media/HBO.list`](Media/HBO.list) | HBO | a streaming policy | 6 |
+| [`Media/Hulu.list`](Media/Hulu.list) | Hulu | a streaming policy | 3 |
+| [`Media/Netflix.list`](Media/Netflix.list) | Netflix | Netflix | 8 |
+| [`Media/PrimeVideo.list`](Media/PrimeVideo.list) | Prime Video | a streaming policy | 5 |
+| [`Media/Spotify.list`](Media/Spotify.list) | Spotify | a streaming policy | 5 |
+| [`Media/TikTok.list`](Media/TikTok.list) | TikTok | a streaming policy | 8 |
+| [`Media/Twitch.list`](Media/Twitch.list) | Twitch | a streaming policy | 4 |
+| [`Media/Viu.list`](Media/Viu.list) | Viu | a streaming policy | 2 |
+| [`Media/YouTube.list`](Media/YouTube.list) | YouTube | a streaming policy | 9 |
+| [`Media/Youku.list`](Media/Youku.list) | Youku | Domestic | 3 |
+| [`Media/iQiyi.list`](Media/iQiyi.list) | iQiyi | Domestic | 4 |
+
+### Developer
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Developer/Atlassian.list`](Developer/Atlassian.list) | Atlassian | Proxy | 6 |
+| [`Developer/Cloudflare.list`](Developer/Cloudflare.list) | Cloudflare | Proxy | 7 |
+| [`Developer/Docker.list`](Developer/Docker.list) | Docker | Proxy | 3 |
+| [`Developer/Figma.list`](Developer/Figma.list) | Figma | Proxy | 2 |
+| [`Developer/GitLab.list`](Developer/GitLab.list) | GitLab | Proxy | 3 |
+| [`Developer/JetBrains.list`](Developer/JetBrains.list) | JetBrains | Proxy | 4 |
+| [`Developer/Notion.list`](Developer/Notion.list) | Notion | Proxy | 4 |
+| [`Developer/Npm.list`](Developer/Npm.list) | npm | Proxy | 3 |
+| [`Developer/Slack.list`](Developer/Slack.list) | Slack | Proxy | 4 |
+| [`Developer/Vercel.list`](Developer/Vercel.list) | Vercel | Proxy | 7 |
+
+### Gaming
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Gaming/Blizzard.list`](Gaming/Blizzard.list) | Blizzard | a gaming policy | 2 |
+| [`Gaming/EA.list`](Gaming/EA.list) | EA | a gaming policy | 3 |
+| [`Gaming/Epic.list`](Gaming/Epic.list) | Epic Games | a gaming policy | 6 |
+| [`Gaming/HoYoverse.list`](Gaming/HoYoverse.list) | HoYoverse | a gaming policy | 3 |
+| [`Gaming/Nintendo.list`](Gaming/Nintendo.list) | Nintendo | a gaming policy | 13 |
+| [`Gaming/PlayStation.list`](Gaming/PlayStation.list) | PlayStation | a gaming policy | 5 |
+| [`Gaming/Riot.list`](Gaming/Riot.list) | Riot | a gaming policy | 5 |
+| [`Gaming/Steam.list`](Gaming/Steam.list) | Steam | a gaming policy | 10 |
+| [`Gaming/Ubisoft.list`](Gaming/Ubisoft.list) | Ubisoft | a gaming policy | 3 |
+| [`Gaming/Xbox.list`](Gaming/Xbox.list) | Xbox | a gaming policy | 8 |
+| [`Gaming/miHoYo.list`](Gaming/miHoYo.list) | miHoYo | Domestic | 3 |
+
+### Finance
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Finance/Binance.list`](Finance/Binance.list) | Binance | Proxy | 5 |
+| [`Finance/Crypto.list`](Finance/Crypto.list) | Cryptocurrency | Proxy | 11 |
+| [`Finance/PayPal.list`](Finance/PayPal.list) | PayPal | Proxy | 4 |
+| [`Finance/Stripe.list`](Finance/Stripe.list) | Stripe | Proxy | 4 |
+
+### Platforms
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Platforms/Alibaba.list`](Platforms/Alibaba.list) | Alibaba | Domestic | 25 |
+| [`Platforms/Amazon.list`](Platforms/Amazon.list) | Amazon | Proxy | 9 |
+| [`Platforms/Apple.list`](Platforms/Apple.list) | Apple | DIRECT | 17 |
+| [`Platforms/AppleChina.list`](Platforms/AppleChina.list) | Apple China | Domestic | 7 |
+| [`Platforms/Baidu.list`](Platforms/Baidu.list) | Baidu | Domestic | 10 |
+| [`Platforms/ByteDance.list`](Platforms/ByteDance.list) | ByteDance | Domestic | 44 |
+| [`Platforms/Google.list`](Platforms/Google.list) | Google | Proxy | 35 |
+| [`Platforms/GoogleChina.list`](Platforms/GoogleChina.list) | Google China | Domestic | 5 |
+| [`Platforms/Huawei.list`](Platforms/Huawei.list) | Huawei | Domestic | 6 |
+| [`Platforms/JD.list`](Platforms/JD.list) | JD | Domestic | 7 |
+| [`Platforms/Meituan.list`](Platforms/Meituan.list) | Meituan | Domestic | 5 |
+| [`Platforms/Meta.list`](Platforms/Meta.list) | Meta | Proxy | 5 |
+| [`Platforms/Microsoft.list`](Platforms/Microsoft.list) | Microsoft | Microsoft | 46 |
+| [`Platforms/MicrosoftCDN.list`](Platforms/MicrosoftCDN.list) | Microsoft CDN | DIRECT | 17 |
+| [`Platforms/NetEase.list`](Platforms/NetEase.list) | NetEase | Domestic | 11 |
+| [`Platforms/Tencent.list`](Platforms/Tencent.list) | Tencent | Domestic | 21 |
+| [`Platforms/Trip.list`](Platforms/Trip.list) | Trip.com | Domestic | 4 |
+| [`Platforms/Xiaomi.list`](Platforms/Xiaomi.list) | Xiaomi | Domestic | 10 |
 
 ### Geo
 

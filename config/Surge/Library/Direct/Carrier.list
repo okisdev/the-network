@@ -1,7 +1,7 @@
-# The Network: carrier services
+# The Network: Carrier services
 #
-# Expects DIRECT. The hostname pattern also belongs in the profile's always-real-ip so the tunnel client sees real addresses.
+# Expects DIRECT.
 #
-# Wi-Fi Calling ePDG endpoints. The IKEv2/IPsec tunnel (UDP 500/4500) must terminate at the carrier from the real access network; through a proxy exit it either fails registration or pins calls to the exit region. Measured here as 551 UDP flows to a carrier ePDG riding the fallthrough proxy in 14 days.
+# Wi-Fi Calling ePDG endpoints. The IKEv2/IPsec tunnel must terminate at the carrier from the real access network; through a proxy exit it either fails registration or pins calls to the exit region. The hostname pattern sits in the profile's always-real-ip so the phone sees real addresses, which also means the tunnel reaches the gateway by bare address and this name rule never sees it. Measured as 551 UDP flows to a carrier ePDG riding the fallthrough proxy in 14 days; the inline UDP 500 and 4500 rules in the profile are the fix, and this file keeps the name resolution on the same path.
 
 DOMAIN-SUFFIX,pub.3gppnetwork.org

@@ -1,53 +1,149 @@
 # Overlay first. Do not reorder these relative to each other.
+RULE-SET,SYSTEM,DIRECT
 RULE-SET,<base>/config/Surge/Infrastructure/CloudflareTunnel.list,DIRECT
 RULE-SET,<base>/config/Surge/Tailscale/Coordination.list,Others
 #!MACOS-ONLY RULE-SET,<base>/config/Surge/Tailscale/Tailnet.list,DIRECT
 #!IOS-ONLY RULE-SET,<base>/config/Surge/Tailscale/Tailnet.list,Tailnet
 RULE-SET,<base>/config/Surge/Tailscale/Direct.list,DIRECT
+
+# Transport guards for flows that arrive without a name. Logical rules cannot live in a rule set.
 AND,((PROTOCOL,UDP),(DEST-PORT,3478)),DIRECT
+AND,((PROTOCOL,UDP),(DEST-PORT,19302)),DIRECT
+AND,((PROTOCOL,UDP),(DEST-PORT,123)),DIRECT
+AND,((PROTOCOL,UDP),(DEST-PORT,500)),DIRECT
+AND,((PROTOCOL,UDP),(DEST-PORT,4500)),DIRECT
+AND,((PROTOCOL,TCP),(DEST-PORT,22000)),DIRECT
+AND,((PROTOCOL,TCP),(DEST-PORT,22067)),DIRECT
+
 RULE-SET,<base>/config/Surge/Apple/ApplePush.list,DIRECT
 RULE-SET,<base>/config/Surge/Apple/iCloudContent.list,DIRECT
-RULE-SET,<base>/config/Surge/Apple/AppleIntelligence.list,AI Suite
+RULE-SET,<base>/config/Surge/Apple/AppleIntelligence.list,AI Suite,extended-matching
 RULE-SET,<base>/config/Surge/Rescue/Douyin.list,Domestic
 RULE-SET,<base>/config/Surge/Rescue/Meituan.list,Domestic
 RULE-SET,<base>/config/Surge/Rescue/Kuaishou.list,Domestic
-RULE-SET,<base>/config/Surge/Rescue/BlockedDirect.list,Proxy
+RULE-SET,<base>/config/Surge/Rescue/BetterStack.list,Proxy
+RULE-SET,<base>/config/Surge/AI/AIChina.list,Domestic
 RULE-SET,<base>/config/Surge/AI/AI.list,AI Suite,extended-matching
 RULE-SET,<base>/config/Surge/GitHub/GitHub.list,🇯🇵 JP
+RULE-SET,<base>/config/Surge/Registries/Registries.list,DIRECT
 
-# Library. Policies match the panel groups: AdBlock, Netflix, Telegram, Microsoft, Others.
+# Local processes and private names.
 RULE-SET,<base>/config/Surge/Library/Process/ProxyCores.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Process/Downloaders.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Direct/Private.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Geo/LAN.list,DIRECT
+
+# Reject. Rescue above must precede this block; the service lists below must follow it. The pre-matching set and REJECT-NO-DROP are hard-coded and do not follow the AdBlock group.
 RULE-SET,<base>/config/Surge/Library/Reject/HttpDNS.list,AdBlock
 RULE-SET,<base>/config/Surge/Library/Reject/Ads.list,AdBlock
+RULE-SET,https://ruleset.skk.moe/List/non_ip/reject-drop.conf,REJECT-DROP,pre-matching
+DOMAIN-SET,https://ruleset.skk.moe/List/domainset/reject.conf,AdBlock,extended-matching
+DOMAIN-SET,https://ruleset.skk.moe/List/domainset/reject_phishing.conf,AdBlock
+RULE-SET,https://ruleset.skk.moe/List/non_ip/reject.conf,AdBlock,extended-matching
+RULE-SET,https://ruleset.skk.moe/List/non_ip/reject-no-drop.conf,REJECT-NO-DROP,extended-matching
+RULE-SET,https://ruleset.skk.moe/List/non_ip/sogouinput.conf,AdBlock
+
+# Direct services.
+RULE-SET,<base>/config/Surge/Library/Direct/Certificates.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Direct/NTP.list,DIRECT
-RULE-SET,<base>/config/Surge/Library/Direct/Speedtest.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Direct/Carrier.list,DIRECT
+RULE-SET,<base>/config/Surge/Library/Direct/Syncthing.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Direct/Download.list,DIRECT
-RULE-SET,<base>/config/Surge/Library/Direct/Registries.list,DIRECT
 RULE-SET,<base>/config/Surge/Library/Direct/CDNChina.list,DIRECT
-RULE-SET,<base>/config/Surge/Library/Direct/AppleCDN.list,DIRECT
+RULE-SET,<base>/config/Surge/Library/Proxy/Speedtest.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Proxy/DoH.list,Proxy
+
+# Apple. The four exceptions precede the company floor.
+RULE-SET,<base>/config/Surge/Library/Platforms/AppleChina.list,Domestic,extended-matching
 RULE-SET,<base>/config/Surge/Library/Media/AppleMedia.list,Proxy,extended-matching
-RULE-SET,<base>/config/Surge/Library/Platforms/AppleServices.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Direct/PrivateRelay.list,DIRECT,extended-matching
+RULE-SET,<base>/config/Surge/Library/Platforms/Apple.list,DIRECT,extended-matching
+
+# Microsoft. CDN and Xbox precede the company set.
 RULE-SET,<base>/config/Surge/Library/Platforms/MicrosoftCDN.list,DIRECT
+RULE-SET,<base>/config/Surge/Library/Gaming/Xbox.list,Proxy
 RULE-SET,<base>/config/Surge/Library/Platforms/Microsoft.list,Microsoft,extended-matching
+
+# Social.
 RULE-SET,<base>/config/Surge/Library/Social/Telegram.list,Telegram,extended-matching
 RULE-SET,<base>/config/Surge/Library/Social/Discord.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Social/X.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Social/WhatsApp.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Social/Facebook.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/Instagram.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/Line.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/LinkedIn.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/Reddit.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/Snap.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/Bluesky.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Social/WeChat.list,Domestic,extended-matching
+RULE-SET,<base>/config/Surge/Library/Social/Weibo.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Social/Xiaohongshu.list,Domestic
+
+# Media.
 RULE-SET,<base>/config/Surge/Library/Media/Netflix.list,Netflix,extended-matching
 RULE-SET,<base>/config/Surge/Library/Media/YouTube.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Media/Disney.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Media/Spotify.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/Library/Media/TikTok.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Media/HBO.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Media/Hulu.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Media/PrimeVideo.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Media/Twitch.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Media/Bahamut.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Media/Viu.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Media/Bilibili.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Media/iQiyi.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Media/Youku.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Media/China.list,Domestic
+
+# Gaming.
 RULE-SET,<base>/config/Surge/Library/Gaming/Steam.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/Nintendo.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/PlayStation.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/Epic.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/Riot.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/Blizzard.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/EA.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/Ubisoft.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/HoYoverse.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Gaming/miHoYo.list,Domestic
+
+# Developer and finance.
+RULE-SET,<base>/config/Surge/Library/Developer/Npm.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/GitLab.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Docker.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Vercel.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Cloudflare.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Notion.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Figma.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Slack.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/Atlassian.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Developer/JetBrains.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Finance/PayPal.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Finance/Stripe.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Finance/Binance.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Finance/Crypto.list,Proxy
+
+# Company-wide sets, after the more specific files.
+RULE-SET,<base>/config/Surge/Library/Platforms/GoogleChina.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/Google.list,Proxy,extended-matching
+RULE-SET,<base>/config/Surge/Library/Platforms/Meta.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Platforms/Amazon.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Platforms/Xiaomi.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Platforms/JD.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Platforms/Meituan.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/ByteDance.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/Tencent.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/Alibaba.list,Domestic
-RULE-SET,<base>/config/Surge/Library/Proxy/DoH.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Platforms/Baidu.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Platforms/NetEase.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Platforms/Huawei.list,Domestic
+RULE-SET,<base>/config/Surge/Library/Platforms/Trip.list,Domestic
+DOMAIN-SUFFIX,cn,Domestic
+
+# Address rules last.
+RULE-SET,https://ruleset.skk.moe/List/ip/reject.conf,REJECT-DROP
 RULE-SET,<base>/config/Surge/Library/Geo/TelegramCIDR.list,Telegram
 RULE-SET,LAN,DIRECT
 GEOIP,CN,Domestic

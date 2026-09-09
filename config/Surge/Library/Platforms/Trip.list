@@ -1,0 +1,10 @@
+# The Network: Trip.com
+#
+# Expects Domestic.
+#
+# Ctrip and its international brand share one infrastructure, and the app used here alternates between the two names.
+
+DOMAIN-SUFFIX,c-ctrip.com
+DOMAIN-SUFFIX,ctrip.com
+DOMAIN-SUFFIX,trip.com
+DOMAIN-SUFFIX,tripcdn.com

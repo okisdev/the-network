@@ -1,8 +1,19 @@
 # The Network: Nintendo
 #
 # Expects a gaming policy.
+#
+# Accounts, the eShop, Switch Online and the game services under nintendo.net. The download CDN cdn.nintendo.net lives in Direct/Download.list. nintendo.cn and nintendoswitch.cn, the Tencent-operated mainland service, fall to the .cn rule. The Switch reaches its NAT traversal and push servers under srv.nintendo.net by bare address, because the profile's always-real-ip hands it real answers; those flows never match a name rule and need a device rule in the profile if they are to stay direct.
 
-DOMAIN-SUFFIX,nintendo-europe.com
+DOMAIN-SUFFIX,nintendo.co.jp
+DOMAIN-SUFFIX,nintendo.co.kr
+DOMAIN-SUFFIX,nintendo.co.uk
 DOMAIN-SUFFIX,nintendo.com
+DOMAIN-SUFFIX,nintendo.com.au
+DOMAIN-SUFFIX,nintendo.com.hk
+DOMAIN-SUFFIX,nintendo.eu
+DOMAIN-SUFFIX,nintendo.jp
 DOMAIN-SUFFIX,nintendo.net
+DOMAIN-SUFFIX,nintendo.tw
+DOMAIN-SUFFIX,nintendo-europe.com
+DOMAIN-SUFFIX,nintendoswitch.com
 DOMAIN-SUFFIX,nintendowifi.net

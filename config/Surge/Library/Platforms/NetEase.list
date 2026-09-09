@@ -1,9 +1,17 @@
 # The Network: NetEase
 #
 # Expects Domestic.
+#
+# Mail, games, Yunxin and the music CDN mirrors. NetEase Cloud Music itself is music.163.com under this file.
 
 DOMAIN-SUFFIX,126.com
+DOMAIN-SUFFIX,126.net
 DOMAIN-SUFFIX,127.net
 DOMAIN-SUFFIX,163.com
+DOMAIN-SUFFIX,163jiasu.com
+DOMAIN-SUFFIX,163yun.com
+DOMAIN-SUFFIX,lofter.com
 DOMAIN-SUFFIX,netease.com
+DOMAIN-SUFFIX,netease.im
 DOMAIN-SUFFIX,yeah.net
+DOMAIN-SUFFIX,youdao.com

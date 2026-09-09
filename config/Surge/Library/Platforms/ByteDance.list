@@ -2,18 +2,49 @@
 #
 # Expects Domestic.
 #
-# TikTok international stays in Media/TikTok and expects a streaming policy.
+# Douyin, Toutiao, Feishu, Volcano Engine and the e-commerce and mini-app estates. TikTok stays in Media/TikTok.list and expects a streaming policy. The content CDNs (douyincdn.com, douyinvod.com, byteimg.com, bytecdn.cn, pstatp.com) live in Direct/CDNChina.list. Rescue/Douyin.list precedes the reject layer for the app hosts it blocks.
 
+DOMAIN-SUFFIX,365yg.com
+DOMAIN-SUFFIX,amemv.com
+DOMAIN-SUFFIX,baike.com
+DOMAIN-SUFFIX,bdxiguastatic.com
 DOMAIN-SUFFIX,byted.org
 DOMAIN-SUFFIX,bytedance.com
+DOMAIN-SUFFIX,bytedance.net
+DOMAIN-SUFFIX,bytedancevod.com
+DOMAIN-SUFFIX,bytednsdoc.com
+DOMAIN-SUFFIX,byteeffecttos.com
+DOMAIN-SUFFIX,bytegecko.com
+DOMAIN-SUFFIX,bytehwm.com
+DOMAIN-SUFFIX,bytemaimg.com
+DOMAIN-SUFFIX,bytemastatic.com
+DOMAIN-SUFFIX,bytescm.com
+DOMAIN-SUFFIX,bytetos.com
+DOMAIN-SUFFIX,dailygn.com
 DOMAIN-SUFFIX,douyin.com
-DOMAIN-SUFFIX,douyincdn.com
+DOMAIN-SUFFIX,douyinpic.com
+DOMAIN-SUFFIX,douyinstatic.com
+DOMAIN-SUFFIX,ecombdapi.com
+DOMAIN-SUFFIX,ecombdimg.com
+DOMAIN-SUFFIX,ecombdpage.com
+DOMAIN-SUFFIX,ecombdstatic.com
 DOMAIN-SUFFIX,feishu.cn
+DOMAIN-SUFFIX,huoshan.com
+DOMAIN-SUFFIX,huoshanimg.com
+DOMAIN-SUFFIX,ibytedapm.com
+DOMAIN-SUFFIX,idouyinvod.com
 DOMAIN-SUFFIX,iesdouyin.com
 DOMAIN-SUFFIX,ixigua.com
+DOMAIN-SUFFIX,jinritemai.com
 DOMAIN-SUFFIX,larksuite.com
+DOMAIN-SUFFIX,pipix.com
+DOMAIN-SUFFIX,qishui.com
 DOMAIN-SUFFIX,snssdk.com
 DOMAIN-SUFFIX,toutiao.com
 DOMAIN-SUFFIX,toutiaoapi.com
+DOMAIN-SUFFIX,toutiaocloud.com
 DOMAIN-SUFFIX,volccdn.com
+DOMAIN-SUFFIX,volcengine.com
 DOMAIN-SUFFIX,volces.com
+DOMAIN-SUFFIX,zijieapi.com
+DOMAIN-SUFFIX,zjcdn.com

@@ -1,8 +1,13 @@
 # The Network: Vercel
 #
 # Expects Proxy.
+#
+# Blob storage lives in Direct/Download.list.
 
 DOMAIN-SUFFIX,now.sh
 DOMAIN-SUFFIX,vercel-insights.com
+DOMAIN-SUFFIX,vercel-scripts.com
+DOMAIN-SUFFIX,vercel-status.com
 DOMAIN-SUFFIX,vercel.app
 DOMAIN-SUFFIX,vercel.com
+DOMAIN-SUFFIX,vercel.sh

@@ -2,14 +2,26 @@
 #
 # Expects Domestic.
 #
-# WeChat has its own file.
+# WeChat has its own file, the QQ media brands live in Media/China.list, and qcloudcdn.com in Direct/CDNChina.list.
 
+DOMAIN-SUFFIX,foxmail.com
 DOMAIN-SUFFIX,gtimg.cn
 DOMAIN-SUFFIX,gtimg.com
 DOMAIN-SUFFIX,idqqimg.com
+DOMAIN-SUFFIX,myapp.com
 DOMAIN-SUFFIX,myqcloud.com
 DOMAIN-SUFFIX,qcloud.com
+DOMAIN-SUFFIX,qlivecdn.com
 DOMAIN-SUFFIX,qq.com
+DOMAIN-SUFFIX,qqmail.com
+DOMAIN-SUFFIX,smtcdns.com
 DOMAIN-SUFFIX,tencent-cloud.net
 DOMAIN-SUFFIX,tencent.com
+DOMAIN-SUFFIX,tencentcs.com
 DOMAIN-SUFFIX,tencentmusic.com
+DOMAIN-SUFFIX,tliveapp.com
+DOMAIN-SUFFIX,tlivecdn.com
+DOMAIN-SUFFIX,tlivedns.com
+DOMAIN-SUFFIX,tlivemcdn.com
+DOMAIN-SUFFIX,tlivesource.com
+DOMAIN-SUFFIX,wegame.com

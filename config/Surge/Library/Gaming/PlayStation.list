@@ -1,8 +1,11 @@
 # The Network: PlayStation
 #
 # Expects a gaming policy.
+#
+# stun.playstation.net sits in the profile's always-real-ip, so a console's NAT probes reach the gateway by address and never match here.
 
 DOMAIN-SUFFIX,playstation.com
 DOMAIN-SUFFIX,playstation.net
+DOMAIN-SUFFIX,playstationnetwork.com
 DOMAIN-SUFFIX,sie.com
 DOMAIN-SUFFIX,sonyentertainmentnetwork.com

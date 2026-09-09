@@ -2,21 +2,32 @@
 #
 # Expects DIRECT.
 #
-# Netdisk fronts plus OS and game content CDNs. BlockedDirect in the overlay must precede this file.
+# Netdisk fronts, OS and game content CDNs, and the update and object storage hosts that the 14 days to 2026-09-09 measured clean on the direct path: store.setapp.com 460 flows, Cloudflare R2 559, the 1Password caches 225, OrbStack updates 183, iStat Menus updates 105, none failed. The Steam and Nintendo delivery hosts follow the same rule for game downloads without a measurement yet. Microsoft delivery lives in Platforms/MicrosoftCDN.list.
 
 DOMAIN-SUFFIX,123pan.com
 DOMAIN-SUFFIX,alipan.com
 DOMAIN-SUFFIX,aliyundrive.com
+DOMAIN-SUFFIX,backblazeb2.com
 DOMAIN-SUFFIX,baidupcs.com
+DOMAIN-SUFFIX,cdn.nintendo.net
+DOMAIN-SUFFIX,cloudflarestorage.com
 DOMAIN-SUFFIX,lanzoui.com
 DOMAIN-SUFFIX,lanzoux.com
 DOMAIN-SUFFIX,pan.baidu.com
 DOMAIN-SUFFIX,quark.cn
+DOMAIN-SUFFIX,r2.dev
+DOMAIN-SUFFIX,steamcdn-a.akamaihd.net
 DOMAIN-SUFFIX,steamcontent.com
+DOMAIN-SUFFIX,steampipe.akamaized.net
 DOMAIN-SUFFIX,thunderurl.com
+DOMAIN-SUFFIX,vercel-storage.com
 DOMAIN-SUFFIX,weiyun.com
-DOMAIN-SUFFIX,windowsupdate.com
 DOMAIN-SUFFIX,wenshushu.cn
 DOMAIN-SUFFIX,xunlei.com
-DOMAIN,dl.delivery.mp.microsoft.com
-DOMAIN,officecdn.microsoft.com
+DOMAIN,api-updates.orbstack.dev
+DOMAIN,app-updates.agilebits.com
+DOMAIN,cache.agilebits.com
+DOMAIN,cdn-updates.orbstack.dev
+DOMAIN,softwareupdate.pilotmoon.com
+DOMAIN,store.setapp.com
+DOMAIN,updates.istatmenus.app

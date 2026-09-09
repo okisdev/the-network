@@ -1,6 +1,6 @@
 # The Network: iCloud Private Relay
 #
-# Expects DIRECT. Must precede the iCloud and Apple services classifications, which would otherwise swallow the mask hosts.
+# Expects DIRECT, referenced with extended-matching. Must precede Platforms/Apple.list, which would otherwise swallow the mask hosts; it exists as its own file so the relay can be switched off for the whole network by pointing it at REJECT.
 #
 # Private Relay negotiates its own QUIC transport to the relay edge. On a proxy policy that bootstrap is blocked by the profile's QUIC policy and every attempt burns a retry before TCP fallback; measured at 550 blocked flows in 14 days. DIRECT lets it negotiate for itself. To disable Private Relay at the network instead, point this file at REJECT in the profile.
 

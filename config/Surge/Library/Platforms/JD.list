@@ -1,0 +1,13 @@
+# The Network: JD
+#
+# Expects Domestic.
+#
+# The store, payments and JD Cloud. The image CDN 360buyimg.com lives in Direct/CDNChina.list.
+
+DOMAIN-SUFFIX,3.cn
+DOMAIN-SUFFIX,jd.com
+DOMAIN-SUFFIX,jd.hk
+DOMAIN-SUFFIX,jdcloud.com
+DOMAIN-SUFFIX,jdcloud-oss.com
+DOMAIN-SUFFIX,jddj.com
+DOMAIN-SUFFIX,jdpay.com

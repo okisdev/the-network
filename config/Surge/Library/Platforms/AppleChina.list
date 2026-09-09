@@ -1,8 +1,13 @@
 # The Network: Apple China
 #
-# Expects Domestic. Must precede Platforms/AppleServices.list.
+# Expects Domestic, referenced with extended-matching. Must precede Platforms/Apple.list, whose apple.com suffix would otherwise take the -cn location and Maps hosts. Those hosts carry the region inside a label (gspe19-cn-ssl, gsp10-ssl-cn), which a suffix rule cannot see, so the wildcard does that work.
 #
-# The mainland-operated estate. These serve from mainland infrastructure and belong on the domestic path; through a proxy exit they still answer, which is how the mismatch hides. Measured as mainland iCloud IMAP riding the proxy while classified under the services list.
+# The mainland-operated estate: iCloud on GCBD, the .cn store, and the location, Maps and search endpoints that serve mainland devices. Through a proxy exit they still answer, which is how the mismatch hides; measured as mainland iCloud IMAP riding the proxy while classified under the old services list.
 
 DOMAIN-SUFFIX,apple.com.cn
 DOMAIN-SUFFIX,icloud.com.cn
+DOMAIN-WILDCARD,gsp*-cn*.ls.apple.com
+DOMAIN,api.smoot.apple.cn
+DOMAIN,cl2-cn.apple.com
+DOMAIN,cl4-cn.apple.com
+DOMAIN,gs-loc-cn.apple.com

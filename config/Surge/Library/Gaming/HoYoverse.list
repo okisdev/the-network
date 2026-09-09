@@ -1,8 +1,9 @@
 # The Network: HoYoverse
 #
 # Expects a gaming policy.
+#
+# The global publisher. The mainland servers under mihoyo.com and yuanshen.com live in Gaming/miHoYo.list and expect Domestic.
 
+DOMAIN-SUFFIX,honkaiimpact3.com
 DOMAIN-SUFFIX,hoyolab.com
 DOMAIN-SUFFIX,hoyoverse.com
-DOMAIN-SUFFIX,mihoyo.com
-DOMAIN-SUFFIX,yuanshen.com

@@ -2,7 +2,7 @@
 #
 # Expects DIRECT.
 #
-# Time sync should not ride a proxy path.
+# Time sync should not ride a proxy path. These names sit in the profile's always-real-ip, so the packets themselves reach the gateway by bare address and only the inline UDP 123 rule in the profile catches them; measured as 21,000 NTP flows to Apple's time servers riding the fallthrough proxy in the 14 days to 2026-09-09.
 
 DOMAIN-SUFFIX,pool.ntp.org
 DOMAIN,ntp.aliyun.com

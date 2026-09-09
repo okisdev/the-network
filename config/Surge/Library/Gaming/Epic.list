@@ -3,6 +3,8 @@
 # Expects a gaming policy.
 
 DOMAIN-SUFFIX,easy.ac
+DOMAIN-SUFFIX,easyanticheat.net
 DOMAIN-SUFFIX,epicgames.com
 DOMAIN-SUFFIX,epicgames.dev
+DOMAIN-SUFFIX,fortnite.com
 DOMAIN-SUFFIX,unrealengine.com
