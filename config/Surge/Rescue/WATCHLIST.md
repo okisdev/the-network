@@ -8,7 +8,8 @@ Hosts that the imported reject layer matches, where the classification looks def
 | `api.segment.io` | Analytics | 24,700 | Apps that block on their analytics client hang at launch |
 | `plausible.io` | Analytics | 160 | Visits to sites that use Plausible go uncounted, including the ones run from this house |
 | `logcollection.ronghub.com` | RongCloud log collection | 72 | Nothing visible; the messaging channel itself is not on this host |
-| `amdc.m.taobao.com`, `amdc.alipay.com` | Alibaba endpoint dispatch | 340 | Taobao and Alipay fall back to ordinary DNS; slower first request, no symptom seen yet |
+| `amdc.m.taobao.com`, `amdc.alipay.com` | Alibaba endpoint dispatch | 340 | Taobao and Alipay fall back to ordinary DNS and to addresses dialed without a name, among them anycast blocks `GEOIP,CN` misses; `Library/Geo/AlibabaCIDR.list` keeps those domestic, so the block costs a slower first request and stays, in line with `Library/Reject/HttpDNS.list` |
+| `fourier.taobao.com`, `fourier.alibaba.com`, `sjarvis.taobao.com` | Alibaba client reporting, function unconfirmed | 775 in the 12 days to 2026-09-21 | Requested on every Taobao launch beside the security hosts that `Alibaba.list` repairs; promote if Taobao still restricts the app with that repair live |
 | `wxa.wxs.qq.com`, `sq.bls.mdt.qq.com` | WeChat mini program statistics | 82 | Nothing visible so far; the messenger channel is not on these hosts |
 | `metrics.icloud.com`, `metrics-config.icloud.com` | iCloud device diagnostics | 1,200 | Apple lists them as diagnostics only |
 | `mqtt.zhihu.com` | Push and telemetry channel | | Zhihu notifications stop arriving |

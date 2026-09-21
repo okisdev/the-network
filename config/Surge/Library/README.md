@@ -28,7 +28,7 @@ A mainland service earns a file when it is in daily use here, so its policy is a
 | `Gaming/` | Stores, publishers and consoles |
 | `Finance/` | Payments and exchanges |
 | `Platforms/` | Company-wide sets. Place after the more specific files |
-| `Geo/` | LAN and Telegram DC prefixes |
+| `Geo/` | LAN, Telegram DC prefixes and Alibaba's anycast space |
 | `Process/` | Download clients and proxy cores |
 
 AI is not in this directory. That category is owned by `AI/AI.list` and `AI/AIChina.list` in the overlay.
