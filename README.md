@@ -10,7 +10,7 @@ A rule earns a place here when it encodes something specific to this network:
 
 - Our own infrastructure. The tailnet address space and the tunnel edge.
 - Measured path faults. Destinations that fail through one exit region and succeed through another.
-- Pins. Apple push and iCloud content stay direct whatever policy the panel hangs the company-wide Apple set on, because a reselection of that group or a blocked QUIC handshake was measured breaking them.
+- Pins. Apple push and iCloud content stay direct whatever policy the panel hangs the company-wide Apple set on, because a reselection of that group, or a QUIC handshake blocked on a proxy path, was measured breaking them. iCloud content is also held to TCP: direct QUIC never failed and measured five to thirteen times slower.
 - False positives to repair. Services that the reject layer kills. Each patch names the symptom.
 - Categories worth owning outright. AI was the first; Apple is the second.
 

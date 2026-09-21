@@ -2,7 +2,7 @@
 #
 # Expects DIRECT, referenced with extended-matching. Must precede Platforms/Apple.list, which would otherwise swallow the mask hosts; it exists as its own file so the relay can be switched off for the whole network by pointing it at REJECT.
 #
-# Private Relay negotiates its own QUIC transport to the relay edge. On a proxy policy that bootstrap is blocked by the profile's QUIC policy and every attempt burns a retry before TCP fallback; measured at 550 blocked flows in 14 days. DIRECT lets it negotiate for itself. To disable Private Relay at the network instead, point this file at REJECT in the profile.
+# Private Relay negotiates its own QUIC transport to the relay edge. On a proxy policy that bootstrap is blocked by the profile's QUIC policy and every attempt burns a retry before TCP fallback; measured at 550 blocked flows in 14 days. DIRECT lets it negotiate for itself. The relay ingress shares 17.248.152.0/24 and 17.248.163.0/24 with the iCloud content edges, so a relay handshake that arrives by address over QUIC is refused by the profile's iCloud content guard and falls back to TCP on this file. To disable Private Relay at the network instead, point this file at REJECT in the profile.
 
 DOMAIN,mask.icloud.com
 DOMAIN,mask-api.icloud.com
