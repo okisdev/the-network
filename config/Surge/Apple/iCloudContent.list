@@ -4,7 +4,9 @@
 #
 # The MMCS content service behind iMessage attachments, Photos, Drive and Backup. Proxied, the global block-quic setting rejected its HTTP/3 and the fallbacks inherited the proxy path's instability: 35 blocked attachment transfers in one 6.6 minute window on 2026-08-12, images stalling on the phone that sent them.
 #
-# This file carries names only. The content edges are also reached over HTTP/3 with no SNI the gateway can read, and those flows can only match by address; Platforms/Apple.list carries Apple's address space for them, after the named exceptions, because an address rule would otherwise take a flow that arrived by address with an SNI the exceptions own.
+# The profile refuses QUIC to these names ahead of this file, so a transfer arrives here over TCP. Direct QUIC never failed and never fell back, and it was slow: in the 12 days to 2026-09-21, transfers of 10 MB or more on the same edges ran at a median of 15.3 Mbps down and 13.4 Mbps up over TCP against 1.2 and 2.6 over QUIC. The guard is a logical rule that takes this file as a sub-rule; config/Surge/README.md carries it.
+#
+# This file carries names only. The content edges are also reached with no SNI the gateway can read, and those flows can only match by address: the guard names the two edge ranges for QUIC, and for everything else Platforms/Apple.list carries Apple's address space for them, after the named exceptions, because an address rule would otherwise take a flow that arrived by address with an SNI the exceptions own.
 
 DOMAIN,content.icloud.com
 DOMAIN-SUFFIX,icloud-content.com

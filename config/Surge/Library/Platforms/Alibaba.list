@@ -2,7 +2,7 @@
 #
 # Expects Domestic.
 #
-# Commerce, payments, cloud, DingTalk, Amap and the device fingerprint hosts. alicdn.com lives in Direct/CDNChina.list; Youku in Media/Youku.list.
+# Commerce, payments, cloud, DingTalk, Amap and the device fingerprint hosts. alicdn.com lives in Direct/CDNChina.list; Youku in Media/Youku.list. The security hosts the reject layer would take first are repaired in Rescue/Alibaba.list, and the anycast space the apps dial by address is in Geo/AlibabaCIDR.list.
 
 DOMAIN-SUFFIX,1688.com
 DOMAIN-SUFFIX,alibaba.com

@@ -15,13 +15,17 @@ AND,((PROTOCOL,UDP),(DEST-PORT,4500)),DIRECT
 AND,((PROTOCOL,TCP),(DEST-PORT,22000)),DIRECT
 AND,((PROTOCOL,TCP),(DEST-PORT,22067)),DIRECT
 
+# iCloud content falls back to TCP. Must precede Apple/iCloudContent.list.
+AND,((PROTOCOL,UDP),(DEST-PORT,443),(OR,((RULE-SET,<base>/config/Surge/Apple/iCloudContent.list),(IP-CIDR,17.248.152.0/24,no-resolve),(IP-CIDR,17.248.163.0/24,no-resolve)))),REJECT-NO-DROP
+
 RULE-SET,<base>/config/Surge/Apple/ApplePush.list,DIRECT
 RULE-SET,<base>/config/Surge/Apple/iCloudContent.list,DIRECT
 RULE-SET,<base>/config/Surge/Apple/AppleIntelligence.list,AI Suite,extended-matching
-RULE-SET,<base>/config/Surge/Rescue/Douyin.list,Domestic
-RULE-SET,<base>/config/Surge/Rescue/Meituan.list,Domestic
-RULE-SET,<base>/config/Surge/Rescue/Kuaishou.list,Domestic
-RULE-SET,<base>/config/Surge/Rescue/BetterStack.list,Proxy
+RULE-SET,<base>/config/Surge/Rescue/Douyin.list,Domestic,extended-matching
+RULE-SET,<base>/config/Surge/Rescue/Meituan.list,Domestic,extended-matching
+RULE-SET,<base>/config/Surge/Rescue/Kuaishou.list,Domestic,extended-matching
+RULE-SET,<base>/config/Surge/Rescue/Alibaba.list,Domestic,extended-matching
+RULE-SET,<base>/config/Surge/Rescue/BetterStack.list,Proxy,extended-matching
 RULE-SET,<base>/config/Surge/AI/AIChina.list,Domestic
 RULE-SET,<base>/config/Surge/AI/AI.list,AI Suite,extended-matching
 RULE-SET,<base>/config/Surge/GitHub/GitHub.list,🇯🇵 JP
@@ -145,6 +149,7 @@ DOMAIN-SUFFIX,cn,Domestic
 # Address rules last.
 RULE-SET,https://ruleset.skk.moe/List/ip/reject.conf,REJECT-DROP
 RULE-SET,<base>/config/Surge/Library/Geo/TelegramCIDR.list,Telegram
+RULE-SET,<base>/config/Surge/Library/Geo/AlibabaCIDR.list,Domestic
 RULE-SET,LAN,DIRECT
 GEOIP,CN,Domestic
 FINAL,Others,dns-failed

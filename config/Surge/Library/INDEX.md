@@ -1,6 +1,6 @@
 # Library index
 
-89 first-party rule sets. Policy names match the panel groups.
+90 first-party rule sets. Policy names match the panel groups.
 
 ### Reject
 
@@ -136,6 +136,7 @@
 
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
+| [`Geo/AlibabaCIDR.list`](Geo/AlibabaCIDR.list) | Alibaba CIDR | Domestic | 4 |
 | [`Geo/LAN.list`](Geo/LAN.list) | LAN | DIRECT | 20 |
 | [`Geo/TelegramCIDR.list`](Geo/TelegramCIDR.list) | Telegram CIDR | Telegram | 14 |
 
