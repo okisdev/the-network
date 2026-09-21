@@ -62,6 +62,7 @@ The port guards exist because of flows that reach the gateway without a name. Na
 
 - Overlay precedes library. A repair rule placed behind the classification it is repairing does nothing.
 - Rescue precedes reject, and reject precedes every service list. A service list placed before the reject layer shields that company's telemetry hosts from it.
+- Every Rescue line carries `extended-matching`, because the reject domainset does. A client that dials an address and names the host only in its SNI otherwise passes the repair unmatched and is rejected one block later.
 - The iCloud content QUIC guard precedes `Apple/iCloudContent.list`. Behind the pin it never sees a packet.
 - `Tailscale/Coordination.list` precedes `Tailscale/Direct.list`, because the coordination hosts are covered by the `tailscale.com` suffix in the second file.
 - `AI/AI.list` precedes `Platforms/Google.list`, so the `.google` AI products keep the AI exit; `Platforms/GoogleChina.list` precedes it too.
