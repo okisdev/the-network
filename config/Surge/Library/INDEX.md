@@ -14,7 +14,7 @@
 | File | Title | Expected policy | Rules |
 | --- | --- | --- | ---: |
 | [`Direct/CDNChina.list`](Direct/CDNChina.list) | China CDN | DIRECT | 23 |
-| [`Direct/Carrier.list`](Direct/Carrier.list) | Carrier services | DIRECT | 1 |
+| [`Direct/Carrier.list`](Direct/Carrier.list) | Carrier services | DIRECT | 15 |
 | [`Direct/Certificates.list`](Direct/Certificates.list) | Certificate validation | DIRECT | 30 |
 | [`Direct/Download.list`](Direct/Download.list) | Downloads | DIRECT | 27 |
 | [`Direct/NTP.list`](Direct/NTP.list) | NTP | DIRECT | 11 |
