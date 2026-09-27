@@ -14,6 +14,7 @@
 DOMAIN-SUFFIX,anthropic.com
 DOMAIN-SUFFIX,claude.ai
 DOMAIN-SUFFIX,claude.com
+DOMAIN-SUFFIX,claude.dev
 
 # OpenAI. The keyword covers Azure hosted deployments and the assorted api hosts.
 DOMAIN-SUFFIX,openai.com
@@ -28,7 +29,7 @@ DOMAIN-SUFFIX,x.ai
 DOMAIN-SUFFIX,grok.com
 DOMAIN,grok.x.com
 
-# Google
+# Google. geminiweb-pa serves Gemini in Chrome; robinfrontend-pa and proactivebackend-pa serve the Gemini app on Android.
 DOMAIN,ai.google.dev
 DOMAIN,jules.google.com
 DOMAIN,antigravity.google
@@ -40,16 +41,20 @@ DOMAIN-SUFFIX,notebooklm.google.com
 DOMAIN-SUFFIX,deepmind.google
 DOMAIN-SUFFIX,generativelanguage.googleapis.com
 DOMAIN-SUFFIX,cloudcode-pa.googleapis.com
+DOMAIN-SUFFIX,geminiweb-pa.googleapis.com
+DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com
+DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com
 
 # GitHub Copilot. The model endpoint is githubcopilot.com; api.github.com is ordinary
 # GitHub API traffic and lives in config/Surge/GitHub/GitHub.list.
 DOMAIN-SUFFIX,githubcopilot.com
 
-# Editors and agent tooling. cursor.com does not cover the CDN or API hosts.
+# Editors and agent tooling. cursor.com does not cover the CDN, the API hosts or the cloud agent VMs.
 DOMAIN-SUFFIX,cursor.com
 DOMAIN-SUFFIX,cursor.sh
 DOMAIN-SUFFIX,cursor-cdn.com
 DOMAIN-SUFFIX,cursorapi.com
+DOMAIN-SUFFIX,cursorvm.com
 DOMAIN-SUFFIX,claudeusercontent.com
 DOMAIN-SUFFIX,claudemcpclient.com
 DOMAIN-SUFFIX,claudemcpcontent.com
@@ -75,13 +80,16 @@ DOMAIN-SUFFIX,bolt.new
 DOMAIN-SUFFIX,v0.dev
 DOMAIN-SUFFIX,v0.app
 DOMAIN,api.jetbrains.ai
+DOMAIN-SUFFIX,coderabbit.ai
+DOMAIN-SUFFIX,usemagpie.ai
+DOMAIN-SUFFIX,openclaw.ai
 
-# Raycast. The suffix covers the whole product deliberately: its AI and dictation
-# endpoints need a foreign exit, and so does the rest of it.
+# Raycast. The suffix covers the whole product deliberately: its AI and dictation endpoints need a foreign exit, and so does the rest of it. AI attachments upload to an S3 bucket outside the suffix.
 DOMAIN-SUFFIX,raycast.com
 DOMAIN-SUFFIX,raycast-releases.com
+DOMAIN,raycast-ai-attachments.s3-accelerate.amazonaws.com
 
-# Chat products. kimi.ai is Moonshot's overseas product; the mainland kimi.com lives in AI/AIChina.list.
+# Chat products. kimi.ai is Moonshot's overseas product; the mainland kimi.com lives in AI/AIChina.list. authenticate.cx carries Poke's sign-in and integration links.
 DOMAIN-SUFFIX,meta.ai
 DOMAIN-SUFFIX,poe.com
 DOMAIN-SUFFIX,character.ai
@@ -89,12 +97,16 @@ DOMAIN-SUFFIX,kimi.ai
 DOMAIN-SUFFIX,lobehub.com
 DOMAIN-SUFFIX,lmarena.ai
 DOMAIN-SUFFIX,arena.ai
+DOMAIN-SUFFIX,poke.com
+DOMAIN-SUFFIX,authenticate.cx
 DOMAIN,copilot.microsoft.com
 
 # Aggregators, inference hosts, and model registries
 DOMAIN,openrouter.ai
 DOMAIN,models.dev
+DOMAIN-SUFFIX,modelpedia.dev
 DOMAIN,gateway.ai.cloudflare.com
+DOMAIN,ai-gateway.vercel.sh
 DOMAIN-SUFFIX,perplexity.ai
 DOMAIN-SUFFIX,ollama.com
 DOMAIN-SUFFIX,groq.com
@@ -105,6 +117,7 @@ DOMAIN-SUFFIX,together.ai
 DOMAIN-SUFFIX,together.xyz
 DOMAIN-SUFFIX,fireworks.ai
 DOMAIN-SUFFIX,cerebras.ai
+DOMAIN-SUFFIX,typesafe.ai
 DOMAIN-SUFFIX,deepinfra.com
 DOMAIN-SUFFIX,replicate.com
 DOMAIN-SUFFIX,replicate.delivery
