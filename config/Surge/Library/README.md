@@ -15,6 +15,8 @@ Policy names in [profile.snippet](profile.snippet) match the panel groups (`AdBl
 
 A mainland service earns a file when it is in daily use here, so its policy is a decision rather than a GEOIP lookup. A foreign service earns a file only when its policy or matching differs from `FINAL`: a group of its own (Netflix, Telegram, Microsoft, gaming), a direct path (downloads, registries), a region pin, or `extended-matching` for clients that arrive with a bare address and an SNI. A foreign service that would simply be proxied stays out; `FINAL` already does that.
 
+Banks are named whichever way they go. A bank ties a session to the address it sees, and GEOIP splits a bank's estate between the direct path and the proxy, so `Bank/Direct.list` and `Bank/Proxy.list` give every bank one path by name.
+
 ## Layout
 
 | Directory | What it holds |
@@ -27,6 +29,7 @@ A mainland service earns a file when it is in daily use here, so its policy is a
 | `Developer/` | Forges, clouds, design tools |
 | `Gaming/` | Stores, publishers and consoles |
 | `Finance/` | Payments and exchanges |
+| `Bank/` | Banks, one path each: mainland banks and BOCHK direct, Hong Kong and foreign banks proxied |
 | `Platforms/` | Company-wide sets. Place after the more specific files |
 | `Geo/` | LAN, Telegram DC prefixes and Alibaba's anycast space |
 | `Process/` | Download clients and proxy cores |

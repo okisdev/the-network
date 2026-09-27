@@ -1,0 +1,53 @@
+# The Network: Banks, proxied
+#
+# Expects Proxy. Must precede Bank/Direct.list, whose mainland suffixes would otherwise take CCB Asia and BoCom Hong Kong.
+#
+# A bank ties a session to the address it sees, so each bank takes one path for its whole estate, decided by name. The Hong Kong and foreign banks take the proxy, the path most of their traffic already takes through FINAL. They are named because GEOIP would split them: the mainland resolvers hand some of their edges a mainland or Alibaba anycast address, and those leave direct while the rest of the bank takes the proxy. Measured on the gateway on 2026-09-27: www.hsbc.com resolved into mainland carrier space and matched GEOIP,CN while www.hsbc.com.hk took FINAL, and www.antbank.hk and www.chiyubank.com matched Geo/AlibabaCIDR.list. Each bank's main site answered through both provider sources the same day.
+#
+# In use in the 13 days to 2026-09-27, every flow through FINAL with a response: Standard Chartered (55 flows, 10.8 MB), American Express (110 flows, 8.7 MB), China CITIC Bank International, Chase and Barclays. Their analytics hosts (smetrics.sc.com, svc2.sc.com, omns.americanexpress.com, analytics.chase.com) are rejected by the reject layer, which this file follows, and stay rejected.
+#
+# Scope: the Hong Kong retail and virtual banks, and the foreign banks in use here. A Hong Kong arm that runs its own Hong Kong infrastructure belongs here even when a host sits under its mainland parent's zone: CCB Asia's www.asia.ccb.com resolves into CCB's own Hong Kong network (AS38475), and BoCom Hong Kong's hk.bankcomm.com into the same Hong Kong range as bankcomm.com.hk. Card networks are not banks and stay unclassified.
+
+# Hong Kong retail banks. HSBC's PayMe lives on HSBC's own top-level domain.
+DOMAIN-SUFFIX,hsbc.com.hk
+DOMAIN-SUFFIX,hsbc.com
+DOMAIN-SUFFIX,hsbc
+DOMAIN-SUFFIX,hangseng.com
+DOMAIN-SUFFIX,sc.com
+DOMAIN-SUFFIX,citibank.com.hk
+DOMAIN-SUFFIX,dbs.com.hk
+DOMAIN-SUFFIX,dbs.com
+DOMAIN-SUFFIX,hkbea.com
+DOMAIN-SUFFIX,chiyubank.com
+DOMAIN-SUFFIX,ncb.com.hk
+DOMAIN-SUFFIX,dahsing.com
+DOMAIN-SUFFIX,chbank.com
+DOMAIN-SUFFIX,fubonbank.com.hk
+DOMAIN-SUFFIX,shacombank.com.hk
+DOMAIN-SUFFIX,ocbc.com.hk
+DOMAIN-SUFFIX,publicbank.com.hk
+
+# Hong Kong arms of mainland banks that run their own Hong Kong infrastructure
+DOMAIN-SUFFIX,asia.ccb.com
+DOMAIN-SUFFIX,ccbasia.com
+DOMAIN-SUFFIX,hk.bankcomm.com
+DOMAIN-SUFFIX,bankcomm.com.hk
+DOMAIN-SUFFIX,cmbwinglungbank.com
+DOMAIN-SUFFIX,cncbinternational.com
+
+# Hong Kong virtual banks
+DOMAIN-SUFFIX,za.group
+DOMAIN-SUFFIX,mox.com
+DOMAIN-SUFFIX,livibank.com
+DOMAIN-SUFFIX,welab.bank
+DOMAIN-SUFFIX,airstarbank.com
+DOMAIN-SUFFIX,fusionbank.com
+DOMAIN-SUFFIX,paob.com.hk
+DOMAIN-SUFFIX,antbank.hk
+
+# Foreign banks in use here
+DOMAIN-SUFFIX,americanexpress.com
+DOMAIN-SUFFIX,aexp-static.com
+DOMAIN-SUFFIX,chase.com
+DOMAIN-SUFFIX,barclays.co.uk
+DOMAIN-SUFFIX,barclays.com

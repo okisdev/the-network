@@ -2,14 +2,17 @@
 #
 # Expects Domestic.
 #
-# The mainland providers, kept apart from AI/AI.list so they never take the foreign exit and never depend on GEOIP to stay home.
+# The mainland providers, kept apart from AI/AI.list so they never take the foreign exit and never depend on GEOIP to stay home. askdiandian.com is Xiaohongshu's AI search app, and jimeng.jianying.com is ByteDance's image and video generation site.
 
+DOMAIN-SUFFIX,askdiandian.com
 DOMAIN-SUFFIX,bigmodel.cn
 DOMAIN-SUFFIX,deepseek.com
 DOMAIN-SUFFIX,doubao.com
+DOMAIN-SUFFIX,jimeng.jianying.com
 DOMAIN-SUFFIX,kimi.com
 DOMAIN-SUFFIX,minimaxi.com
 DOMAIN-SUFFIX,moonshot.cn
+DOMAIN-SUFFIX,qianwen.com
 DOMAIN-SUFFIX,qwen.ai
 DOMAIN-SUFFIX,siliconflow.cn
 DOMAIN-SUFFIX,stepfun.com
