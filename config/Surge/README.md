@@ -17,14 +17,19 @@ The drop-in profile is [`Library/profile.snippet`](Library/profile.snippet); it 
 5. **Apple.** Apple China, Apple TV and News, Private Relay, then the company floor `Platforms/Apple.list` on DIRECT.
 6. **Microsoft.** The CDN, Xbox, then the company set on the Microsoft group.
 7. **Social, media, gaming, developer, finance.** One file per service.
-8. **Company-wide sets** after the more specific files, then `DOMAIN-SUFFIX,cn`.
-9. **Addresses.** The imported IP reject set, the Telegram prefixes, Alibaba's anycast space, `LAN`, `GEOIP,CN`, then `FINAL`.
+8. **Banks.** The proxied set, then the direct set; every bank takes one path by name.
+9. **Company-wide sets** after the more specific files, then `DOMAIN-SUFFIX,cn`.
+10. **Addresses.** The imported IP reject set, the Telegram prefixes, Alibaba's anycast space, `LAN`, `GEOIP,CN`, then `FINAL`.
 
 ## Apple
 
 Apple is direct by default. `Platforms/Apple.list` carries every Apple name and Apple's own address space (17.0.0.0/8 and the three IPv6 blocks) and expects DIRECT; the evidence is in its header. Four sets precede it because their policy differs: `Apple/AppleIntelligence.list` on `AI Suite`, `Media/AppleMedia.list` (TV and News) on `Proxy`, `Platforms/AppleChina.list` on `Domestic`, and `Direct/PrivateRelay.list`, which is DIRECT but exists on its own so the relay can be switched off by pointing it at `REJECT`. `Apple/ApplePush.list` and `Apple/iCloudContent.list` sit in the overlay as pins: they are DIRECT too, and they stay DIRECT whatever the panel does with the company floor. The address rules for Apple's space live in the floor and nowhere earlier, because an address rule matches a request that arrived as an address even when it carries an SNI, and 17.248.152.0/24 and 17.248.163.0/24 are shared by the content edges, the Private Relay ingress and the Intelligence relay.
 
 iCloud content is held to TCP. Direct QUIC works and never fails, which is the problem: through this gateway it is slow, and a handshake that succeeds never falls back. On the same edges and devices in the 12 days to 2026-09-21, transfers of 10 MB or more ran at a median of 15.3 Mbps down and 13.4 Mbps up over TCP against 1.2 and 2.6 over QUIC, and QUIC carried most of the upload bytes (17.2 GB against 7.1 GB). A guard ahead of the pin answers UDP 443 to the content names and to the two shared /24s with `REJECT-NO-DROP`, an immediate ICMP refusal that Surge never escalates to a silent drop, so the client retries over TCP at once and lands on the DIRECT pin. Private Relay and Intelligence traffic that reaches those addresses over QUIC falls back the same way and is then matched by name in its own file.
+
+## Banks
+
+A bank ties a session to the address it sees, so each bank takes one path for its whole estate, decided by name. `Library/Bank/Direct.list` carries the mainland banks, UnionPay, ICBC Asia (which runs on its parent's mainland infrastructure) and Bank of China (Hong Kong) on DIRECT; `Library/Bank/Proxy.list` carries the Hong Kong and foreign banks on `Proxy`. BOCHK is direct because the proxy provider refuses `bochk.com` by name on every node tested, while the bank itself accepts the exits and the direct path answers. The proxied set exists although `FINAL` is a proxy: the mainland resolvers hand some Hong Kong bank edges mainland or Alibaba anycast addresses, which `GEOIP,CN` and `Geo/AlibabaCIDR.list` would send direct. The evidence is in the two headers.
 
 ## What cannot live in a rule set
 
@@ -69,6 +74,7 @@ The port guards exist because of flows that reach the gateway without a name. Na
 - `GitHub/GitHub.list` precedes `Registries/Registries.list`, so a GitHub-hosted registry that appears in both keeps the Japan pin instead of falling through to DIRECT.
 - `Registries/Registries.list` precedes `Library/Developer/Npm.list`, so `registry.npmjs.org` stays DIRECT instead of matching the npmjs.org suffix.
 - The four Apple exceptions precede `Platforms/Apple.list`; the Microsoft CDN and Xbox precede `Platforms/Microsoft.list`; `Direct/Download.list` and `Direct/CDNChina.list` precede the company sets whose suffixes cover their hosts.
+- `Library/Bank/Proxy.list` precedes `Library/Bank/Direct.list`, so `www.asia.ccb.com` and `hk.bankcomm.com` keep the proxy instead of matching their mainland parents' suffixes.
 - `Library/Geo/LAN.list` does not carry `100.64.0.0/10`. That range belongs to `Tailscale/Tailnet.list`.
 
 ## Region groups

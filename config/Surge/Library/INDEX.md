@@ -1,6 +1,6 @@
 # Library index
 
-90 first-party rule sets. Policy names match the panel groups.
+92 first-party rule sets. Policy names match the panel groups.
 
 ### Reject
 
@@ -108,6 +108,13 @@
 | [`Finance/Crypto.list`](Finance/Crypto.list) | Cryptocurrency | Proxy | 11 |
 | [`Finance/PayPal.list`](Finance/PayPal.list) | PayPal | Proxy | 4 |
 | [`Finance/Stripe.list`](Finance/Stripe.list) | Stripe | Proxy | 4 |
+
+### Bank
+
+| File | Title | Expected policy | Rules |
+| --- | --- | --- | ---: |
+| [`Bank/Direct.list`](Bank/Direct.list) | Banks, direct | DIRECT | 33 |
+| [`Bank/Proxy.list`](Bank/Proxy.list) | Banks, proxied | Proxy | 36 |
 
 ### Platforms
 
