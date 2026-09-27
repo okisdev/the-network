@@ -129,6 +129,10 @@ RULE-SET,<base>/config/Surge/Library/Finance/Stripe.list,Proxy
 RULE-SET,<base>/config/Surge/Library/Finance/Binance.list,Proxy
 RULE-SET,<base>/config/Surge/Library/Finance/Crypto.list,Proxy
 
+# Banks. The proxied set precedes the direct set.
+RULE-SET,<base>/config/Surge/Library/Bank/Proxy.list,Proxy
+RULE-SET,<base>/config/Surge/Library/Bank/Direct.list,DIRECT
+
 # Company-wide sets, after the more specific files.
 RULE-SET,<base>/config/Surge/Library/Platforms/GoogleChina.list,Domestic
 RULE-SET,<base>/config/Surge/Library/Platforms/Google.list,Proxy,extended-matching

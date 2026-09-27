@@ -1,0 +1,56 @@
+# The Network: Banks, direct
+#
+# Expects DIRECT. Must follow Bank/Proxy.list, which takes two Hong Kong arms out of their mainland parents' suffixes, and precede DOMAIN-SUFFIX,cn.
+#
+# A bank ties a session to the address it sees, so each bank takes one path for its whole estate, decided by name. This file holds the banks whose path is the real access network. It expects DIRECT rather than the Domestic group, so switching that group to a proxy never moves a bank.
+#
+# Mainland banks, with UnionPay because their apps call it inside the same session. In the 13 days to 2026-09-27 the gateway carried China Merchants, CITIC, Industrial, Minsheng, ICBC and UnionPay on the direct path in 301 flows and 105.7 MB. The one flow that left shows why the names are here rather than left to GEOIP: on 2026-09-25 at 02:26 a request for r.cc.cmbimg.com, China Merchants Bank's image host, fell to FINAL with no DNS answer cached for it and sat 24 seconds in a Hong Kong exit with nothing back; its other 12 flows resolved into mainland space and went direct. Hua Xia Bank's site answers direct and failed through both provider sources on three of three attempts on 2026-09-27.
+#
+# Bank of China (Hong Kong) cannot take the proxy at all. The provider refuses bochk.com by name on every node tested on 2026-09-27 (20 Fusion nodes across Hong Kong, Taiwan, Singapore and Japan with exits in five networks, and the Surge-native Hong Kong and Japan nodes): the Fusion nodes close the connection right after the client hello, and the Surge-native nodes answer "access denied", which the Hong Kong one also answers for BOCHK's addresses dialed without a name. The bank is not refusing the exits: through the same Fusion nodes, TLS to 202.127.170.52 without a name returns BOCHK's own EV certificate and home page. The two BOCHK flows in the window rode FINAL to a Hong Kong exit and got nothing back, while the direct path answered www, its and mb.bochk.com from the gateway in 85 to 147 ms. bocgroup.com serves from the same addresses with BOCHK's certificate, and 202.127.168.0/21 is BOCHK's own allocation (netname BOCHKAS), so flows that arrive by address take the same path.
+#
+# ICBC Asia runs on its parent's mainland infrastructure: its app talks to mobilehk.icbc.com.cn in Shanghai Mobile space (39 flows and 29.5 MB direct in the window) and www.icbcasia.com resolves into China Mobile space, so it stays with its parent. The Hong Kong arms that run their own Hong Kong infrastructure are in Bank/Proxy.list.
+
+# Bank of China (Hong Kong). The proxy provider refuses it.
+DOMAIN-SUFFIX,bochk.com
+DOMAIN-SUFFIX,bocgroup.com
+IP-CIDR,202.127.168.0/21,no-resolve
+
+# ICBC Asia, on its parent's mainland infrastructure. Its app hosts sit under icbc.com.cn below.
+DOMAIN-SUFFIX,icbcasia.com
+
+# State-owned banks
+DOMAIN-SUFFIX,icbc.com.cn
+DOMAIN-SUFFIX,ccb.com
+DOMAIN-SUFFIX,abchina.com
+DOMAIN-SUFFIX,abchina.com.cn
+DOMAIN-SUFFIX,boc.cn
+DOMAIN-SUFFIX,bankofchina.com
+DOMAIN-SUFFIX,bankcomm.com
+DOMAIN-SUFFIX,psbc.com
+
+# National joint-stock banks
+DOMAIN-SUFFIX,cmbchina.com
+DOMAIN-SUFFIX,cmbimg.com
+DOMAIN-SUFFIX,cmbimg.cn
+DOMAIN-SUFFIX,citicbank.com
+DOMAIN-SUFFIX,citicbank.cn
+DOMAIN-SUFFIX,bank.ecitic.com
+DOMAIN-SUFFIX,cib.com.cn
+DOMAIN-SUFFIX,cmbc.com.cn
+DOMAIN-SUFFIX,cebbank.com
+DOMAIN-SUFFIX,spdb.com.cn
+DOMAIN-SUFFIX,hxb.com.cn
+DOMAIN-SUFFIX,cgbchina.com.cn
+DOMAIN-SUFFIX,bank.pingan.com
+DOMAIN-SUFFIX,czbank.com
+DOMAIN-SUFFIX,cbhb.com.cn
+DOMAIN-SUFFIX,hfbank.com.cn
+
+# Internet banks
+DOMAIN-SUFFIX,webank.com
+DOMAIN-SUFFIX,mybank.cn
+
+# UnionPay
+DOMAIN-SUFFIX,95516.com
+DOMAIN-SUFFIX,unionpay.com
+DOMAIN-SUFFIX,cup.com.cn
